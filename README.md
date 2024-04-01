@@ -1,5 +1,7 @@
 # Kvstore
 
+`mix deps.get` - get dependencies
+
 `iex -S mix` - start the application
 
 then in shell:
