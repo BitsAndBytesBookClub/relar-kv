@@ -1,5 +1,13 @@
 defmodule Kvstore.LSMPart do
+  require Logger
+
+  def get(nil, _key) do
+    Logger.info("Getting from nil part")
+    nil
+  end
+
   def get(part, key) do
+    Logger.info("Getting key: #{key} from LSMPart: #{part}")
     GenServer.call(String.to_atom(part), {:get, key})
   end
 

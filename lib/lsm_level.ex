@@ -49,35 +49,39 @@ defmodule Kvstore.LSMLevelG do
 
     pairs = Enum.zip(b1, b2)
 
+    enumed_pairs = Enum.with_index(pairs)
+
+    IO.inspect(enumed_pairs)
+
     i =
       Enum.reduce_while(
-        Enum.with_index(pairs),
-        fn [i, {a, b}] ->
+        enumed_pairs,
+        nil,
+        fn {{a, b}, i}, _ ->
           case Enum.sort([a, b, key]) do
+            [_, ^key, ^key] ->
+              {:halt, i + 1}
+
             [_, ^key, _] ->
-              Logger.debug("Key found in LSMLevel #{level}")
               {:halt, i}
 
-            _ ->
-              Logger.debug("Key not found in LSMLevel #{level}")
+            [_, _, ^key] ->
+              {:halt, i + 1}
+
+            [^key, _, _] ->
               {:cont, nil}
           end
-        end,
-        nil
+        end
       )
 
-    IO.inspect(i)
+    case i do
+      nil ->
+        {:reply, nil, state}
 
-    file =
-      case i do
-        nil ->
-          nil
-
-        i ->
-          Enum.at(files, i)
-      end
-
-    {:reply, file, state}
+      i ->
+        Logger.debug("Key in range for LSMLevel #{level}, file: #{Enum.at(files, i)}")
+        {:reply, @path <> "/" <> level <> "/" <> Enum.at(files, i), state}
+    end
   end
 end
 
