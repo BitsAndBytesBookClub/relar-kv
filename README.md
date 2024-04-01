@@ -4,5 +4,6 @@
 
 then in shell:
 
-KV.get("key") - get value by key
-KV.set("key", "value") - set value by key
+`KV.get("key")` - get value by key
+
+`KV.set("key", "value")` - set value by key
