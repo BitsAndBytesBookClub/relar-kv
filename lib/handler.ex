@@ -15,6 +15,8 @@ end
 defmodule Kvstore.Handler do
   use GenServer
 
+  require Logger
+
   def start_link(%{name: n}) do
     GenServer.start_link(__MODULE__, %{}, name: n)
   end
@@ -23,8 +25,30 @@ defmodule Kvstore.Handler do
     {:ok, %{}}
   end
 
+  def from_sst(key) do
+    Kvstore.SSTList.list()
+    |> Enum.reduce_while(nil, fn sst, _ ->
+      case Kvstore.SSTLevel.get(sst, key) do
+        nil -> {:cont, nil}
+        v -> {:halt, v}
+      end
+    end)
+  end
+
   def handle_call({:get, key}, _from, state) do
     val = Kvstore.Memetable.get(key)
+
+    val =
+      case val do
+        nil ->
+          Logger.info("Key not found in memetable: #{key}")
+
+          from_sst(key)
+
+        v ->
+          v
+      end
+
     {:reply, val, state}
   end
 

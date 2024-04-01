@@ -7,8 +7,12 @@ defmodule Kvstore.Application do
 
   @impl true
   def start(_type, _args) do
+    File.mkdir("db/sst")
+
     children = [
-      # Starts a worker by calling: Kvstore.Worker.start_link(arg)
+      {Kvstore.SSTLevelSupervisor, []},
+      {Kvstore.SSTListG, []},
+      {Kvstore.SSTWriterG, []},
       {Kvstore.MemetableG, []},
       Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),
       Supervisor.child_spec({Kvstore.Handler, %{name: :h2}}, id: :h2)
