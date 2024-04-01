@@ -7,10 +7,15 @@ defmodule Kvstore.Application do
 
   @impl true
   def start(_type, _args) do
+    File.mkdir("db")
+    File.mkdir("db/lsm")
     File.mkdir("db/sst")
 
     children = [
-      {Kvstore.SSTLevelSupervisor, []},
+      {Kvstore.LSMPartSupervisor, []},
+      {Kvstore.LSMLevelSupervisor, []},
+      {Kvstore.LSMTreeG, []},
+      {Kvstore.SSTFileSupervisor, []},
       {Kvstore.SSTListG, []},
       {Kvstore.SSTWriterG, []},
       {Kvstore.MemetableG, []},

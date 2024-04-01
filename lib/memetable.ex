@@ -74,13 +74,20 @@ defmodule Kvstore.MemetableG do
     end
   end
 
-  def handle_call({:set, key, value}, _from, %{f: file, count: count, table: table} = state) do
+  def handle_call(
+        {:set, key, value},
+        _from,
+        %{f: file, count: count, table: table, old_table: old_table} = state
+      ) do
     :ok = IO.write(file, "#{key},#{value}\n")
     true = :ets.insert(table, {key, value})
 
-    case count do
-      @max_size -> GenServer.cast(__MODULE__, {:roll})
-      _ -> :ok
+    case [count, old_table] do
+      [n, nil] when n > @max_size ->
+        GenServer.cast(__MODULE__, {:roll})
+
+      _ ->
+        :ok
     end
 
     {:reply, :ok, %{state | count: count + 1}}

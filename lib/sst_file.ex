@@ -1,10 +1,10 @@
-defmodule Kvstore.SSTLevel do
+defmodule Kvstore.SSTFile do
   def get(sst, key) do
     GenServer.call(sst, {:get, key})
   end
 end
 
-defmodule Kvstore.SSTLevelG do
+defmodule Kvstore.SSTFileG do
   use GenServer
 
   require Logger
@@ -42,7 +42,7 @@ defmodule Kvstore.SSTLevelG do
   end
 end
 
-defmodule Kvstore.SSTLevelSupervisor do
+defmodule Kvstore.SSTFileSupervisor do
   use DynamicSupervisor
 
   def start_link(init_arg) do

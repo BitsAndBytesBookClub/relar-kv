@@ -38,7 +38,7 @@ defmodule Kvstore.SSTWriterG do
 
     :ok = File.close(file_descriptor)
 
-    Kvstore.SSTList.add_level(file_name)
+    Kvstore.SSTList.add(file_name)
     Kvstore.Memetable.done_writing()
 
     {:reply, :ok, state}

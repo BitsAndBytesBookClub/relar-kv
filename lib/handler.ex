@@ -28,7 +28,22 @@ defmodule Kvstore.Handler do
   def from_sst(key) do
     Kvstore.SSTList.list()
     |> Enum.reduce_while(nil, fn sst, _ ->
-      case Kvstore.SSTLevel.get(sst, key) do
+      case Kvstore.SSTFile.get(sst, key) do
+        nil -> {:cont, nil}
+        v -> {:halt, v}
+      end
+    end)
+  end
+
+  def from_lsm(key) do
+    Kvstore.LSMTree.get_levels()
+    |> Enum.reduce_while(nil, fn level, _ ->
+      val =
+        level
+        |> Kvstore.LSMLevel.get_part(key)
+        |> Kvstore.LSMPart.get(key)
+
+      case val do
         nil -> {:cont, nil}
         v -> {:halt, v}
       end
@@ -44,6 +59,17 @@ defmodule Kvstore.Handler do
           Logger.info("Key not found in memetable: #{key}")
 
           from_sst(key)
+
+        v ->
+          v
+      end
+
+    val =
+      case val do
+        nil ->
+          Logger.info("Key not found in SSTables: #{key}")
+
+          from_lsm(key)
 
         v ->
           v

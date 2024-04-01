@@ -3,7 +3,7 @@ defmodule Kvstore.SSTList do
     GenServer.call(Kvstore.SSTListG, {:list, nil})
   end
 
-  def add_level(name) do
+  def add(name) do
     GenServer.cast(Kvstore.SSTListG, {:add_level, name})
   end
 end
@@ -28,11 +28,11 @@ defmodule Kvstore.SSTListG do
       |> Enum.map(&Integer.to_string/1)
 
     Enum.each(files, fn file ->
-      Logger.info("Starting SSTLevelG with file: #{file}")
+      Logger.info("Starting SSTFileG with file: #{file}")
 
       DynamicSupervisor.start_child(
-        Kvstore.SSTLevelSupervisor,
-        {Kvstore.SSTLevelG, %{file: file}}
+        Kvstore.SSTFileSupervisor,
+        {Kvstore.SSTFileG, %{file: file}}
       )
     end)
 
@@ -50,8 +50,8 @@ defmodule Kvstore.SSTListG do
     Logger.info("Adding SST file: #{name}")
 
     DynamicSupervisor.start_child(
-      Kvstore.SSTLevelSupervisor,
-      {Kvstore.SSTLevelG, %{file: name}}
+      Kvstore.SSTFileSupervisor,
+      {Kvstore.SSTFileG, %{file: name}}
     )
 
     {:noreply, %{files: [name | files]}}
