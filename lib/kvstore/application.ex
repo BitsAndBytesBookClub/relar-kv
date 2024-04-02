@@ -17,8 +17,9 @@ defmodule Kvstore.Application do
       {Kvstore.LSMTreeG, []},
       {Kvstore.SSTFileSupervisor, []},
       {Kvstore.SSTListG, []},
-      {Kvstore.SSTWriterG, []},
       {Kvstore.MemetableG, []},
+      {Kvstore.CompactionG, []},
+      {Kvstore.SSTWriterG, []},
       Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),
       Supervisor.child_spec({Kvstore.Handler, %{name: :h2}}, id: :h2)
     ]

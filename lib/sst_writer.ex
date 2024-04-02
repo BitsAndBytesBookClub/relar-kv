@@ -40,6 +40,7 @@ defmodule Kvstore.SSTWriterG do
 
     Kvstore.SSTList.add(file_name)
     Kvstore.Memetable.done_writing()
+    Kvstore.Compaction.add_sst()
 
     {:reply, :ok, state}
   end
