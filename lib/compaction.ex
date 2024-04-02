@@ -61,7 +61,7 @@ defmodule Kvstore.CompactionG do
 
   defp combine(sst_data, [], _, _, _) do
     {data, key, value} = next_from_sst(sst_data)
-    Logger.info("Writing remaining sst data to LSM Level 0")
+    Logger.info("Writing remaining sst data to LSM Level 0, key: #{key}, value: #{value}")
     write_to_level0(key, value)
     combine(data, [], :sst, nil, nil)
   end
