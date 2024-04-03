@@ -21,8 +21,8 @@ defmodule Kvstore.LSMPartG do
 
   require Logger
 
-  def start_link(%{file: file, path: path}) do
-    name = path <> "/" <> file
+  def start_link(%{file: file, path: path, iteration: i}) do
+    name = path <> "/" <> file <> "_" <> Integer.to_string(i)
 
     Logger.info("Starting LSMPart: #{name}")
 

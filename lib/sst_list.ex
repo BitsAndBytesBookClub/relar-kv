@@ -81,6 +81,7 @@ defmodule Kvstore.SSTListG do
 
         {_, pid} ->
           DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor, pid)
+          File.rm!(@path <> "/" <> file)
       end
     end)
 

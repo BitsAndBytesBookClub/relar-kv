@@ -37,6 +37,9 @@ defmodule Kvstore.CompactionG do
       compact_ssts_into_level0(sst_files)
 
       Kvstore.LSMTree.update_level(0)
+
+      Kvstore.TrashBin.empty()
+
       File.rename!(@level0_path, Kvstore.TrashBin.path() <> "/" <> "0")
       File.rename!(@new_level0_path, @level0_path)
 
@@ -110,8 +113,18 @@ defmodule Kvstore.CompactionG do
     end
   end
 
+  defp write_to_level0(x, nil, nil) do
+    Logger.error("UNKNOWN WRITE, nil")
+    x
+  end
+
+  defp write_to_level0(x, "", "") do
+    Logger.error("UNKNOWN WRITE, string")
+    x
+  end
+
   defp write_to_level0({fd, count, letter}, key, value) do
-    case count > 5 do
+    case count > 10 do
       true ->
         File.close(fd)
         next_letter = NextLetter.get_next_letter(letter)

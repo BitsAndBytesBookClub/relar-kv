@@ -10,6 +10,12 @@ defmodule KV do
   defp handler() do
     Enum.random([:h1, :h2])
   end
+
+  def add_10_random_keys() do
+    for _ <- 1..9 do
+      KV.set(Random.key(), Random.value())
+    end
+  end
 end
 
 defmodule Kvstore.Handler do
@@ -81,5 +87,17 @@ defmodule Kvstore.Handler do
   def handle_call({:set, key, value}, _from, state) do
     Kvstore.Memetable.set(key, value)
     {:reply, :ok, state}
+  end
+end
+
+defmodule Random do
+  @letters ~w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
+
+  def key() do
+    Enum.reduce(1..3, "", fn _i, acc -> acc <> Enum.random(@letters) end)
+  end
+
+  def value() do
+    Enum.reduce(1..10, "", fn _i, acc -> acc <> Enum.random(@letters) end)
   end
 end

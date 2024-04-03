@@ -3,8 +3,10 @@ defmodule Kvstore.TrashBin do
     "db/trash"
   end
 
-  # TODO move to gen_server?
   def empty() do
-    File.rm_rf!("db/trash/*")
+    File.ls!(path())
+    |> Enum.each(fn file ->
+      File.rm_rf!(path() <> "/" <> file)
+    end)
   end
 end

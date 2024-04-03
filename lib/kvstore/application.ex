@@ -9,9 +9,11 @@ defmodule Kvstore.Application do
   def start(_type, _args) do
     File.mkdir("db")
     File.mkdir("db/lsm")
+    File.mkdir("db/lsm/0")
     File.mkdir("db/sst")
     File.mkdir("db/compacted")
     File.mkdir("db/trash")
+    File.rm_rf!("db/trash/*")
 
     children = [
       {Kvstore.LSMPartSupervisor, []},
