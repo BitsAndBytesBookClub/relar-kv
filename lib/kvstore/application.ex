@@ -10,6 +10,8 @@ defmodule Kvstore.Application do
     File.mkdir("db")
     File.mkdir("db/lsm")
     File.mkdir("db/sst")
+    File.mkdir("db/compacted")
+    File.mkdir("db/trash")
 
     children = [
       {Kvstore.LSMPartSupervisor, []},

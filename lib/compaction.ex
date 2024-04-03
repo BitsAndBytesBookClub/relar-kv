@@ -33,16 +33,24 @@ defmodule Kvstore.CompactionG do
       {:noreply, %{state | ssts: ssts + 1}}
     else
       Logger.info("Compacting SSTables")
-      compact_ssts_into_level0()
+      sst_files = File.ls!(@ssts_path)
+      compact_ssts_into_level0(sst_files)
 
-      # TODO move new level 0 to level 0
+      Kvstore.LSMTree.update_level(0)
+      File.rename!(@level0_path, Kvstore.TrashBin.path() <> "/" <> "0")
+      File.rename!(@new_level0_path, @level0_path)
 
+      Kvstore.TrashBin.empty()
+
+      Kvstore.SSTList.remove(sst_files)
+
+      Logger.info("Finished compacting SSTables")
       {:noreply, %{state | ssts: 0}}
     end
   end
 
-  def compact_ssts_into_level0 do
-    sst_data = get_sst_data()
+  def compact_ssts_into_level0(sst_files) do
+    sst_data = get_sst_data(sst_files)
     lsm_data = get_lsm_data()
     write_data = get_writ_data()
 
@@ -162,9 +170,9 @@ defmodule Kvstore.CompactionG do
     Enum.map(file_descriptors, &IO.stream(&1, :line))
   end
 
-  defp get_sst_data() do
+  defp get_sst_data(files) do
     ssts =
-      File.ls!(@ssts_path)
+      files
       |> Enum.map(&String.to_integer/1)
       |> Enum.sort()
       |> Enum.map(&Integer.to_string/1)

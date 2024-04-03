@@ -6,6 +6,11 @@ defmodule Kvstore.SSTList do
   def add(name) do
     GenServer.cast(Kvstore.SSTListG, {:add_level, name})
   end
+
+  def remove(files) do
+    # TODO remove files from drive
+    GenServer.cast(Kvstore.SSTListG, {:remove, files})
+  end
 end
 
 defmodule Kvstore.SSTListG do
@@ -27,21 +32,29 @@ defmodule Kvstore.SSTListG do
       |> Enum.reverse()
       |> Enum.map(&Integer.to_string/1)
 
-    Enum.each(files, fn file ->
-      Logger.info("Starting SSTFileG with file: #{file}")
+    pids =
+      Enum.map(files, fn file ->
+        Logger.info("Starting SSTFileG with file: #{file}")
 
-      DynamicSupervisor.start_child(
-        Kvstore.SSTFileSupervisor,
-        {Kvstore.SSTFileG, %{file: file}}
-      )
-    end)
+        {:ok, pid} =
+          DynamicSupervisor.start_child(
+            Kvstore.SSTFileSupervisor,
+            {Kvstore.SSTFileG, %{file: file}}
+          )
 
-    {:ok, %{files: files}}
+        pid
+      end)
+
+    {:ok, %{files: Enum.zip([files, pids])}}
   end
 
   def handle_call({:list, _}, _from, %{files: files} = state) do
     Logger.debug("Listing SST files: #{inspect(files)}")
-    atom_files = Enum.map(files, &String.to_atom/1)
+
+    atom_files =
+      files
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.map(&String.to_atom/1)
 
     {:reply, atom_files, state}
   end
@@ -49,11 +62,28 @@ defmodule Kvstore.SSTListG do
   def handle_cast({:add_level, name}, %{files: files}) do
     Logger.info("Adding SST file: #{name}")
 
-    DynamicSupervisor.start_child(
-      Kvstore.SSTFileSupervisor,
-      {Kvstore.SSTFileG, %{file: name}}
-    )
+    {:ok, pid} =
+      DynamicSupervisor.start_child(
+        Kvstore.SSTFileSupervisor,
+        {Kvstore.SSTFileG, %{file: name}}
+      )
 
-    {:noreply, %{files: [name | files]}}
+    {:noreply, %{files: [{name, pid} | files]}}
+  end
+
+  def handle_cast({:remove, files}, %{files: all_files} = state) do
+    Logger.info("Removing SST files: #{inspect(files)}")
+
+    Enum.each(files, fn file ->
+      case Enum.find(all_files, fn {f, _} -> f == file end) do
+        nil ->
+          Logger.error("File not found: #{file}")
+
+        {_, pid} ->
+          DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor, pid)
+      end
+    end)
+
+    {:noreply, %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}
   end
 end
