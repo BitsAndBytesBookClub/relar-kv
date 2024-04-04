@@ -8,8 +8,7 @@ defmodule Kvstore.SSTList do
   end
 
   def remove(files) do
-    # TODO remove files from drive
-    GenServer.cast(Kvstore.SSTListG, {:remove, files})
+    GenServer.call(Kvstore.SSTListG, {:remove, files})
   end
 end
 
@@ -59,19 +58,7 @@ defmodule Kvstore.SSTListG do
     {:reply, atom_files, state}
   end
 
-  def handle_cast({:add_level, name}, %{files: files}) do
-    Logger.info("Adding SST file: #{name}")
-
-    {:ok, pid} =
-      DynamicSupervisor.start_child(
-        Kvstore.SSTFileSupervisor,
-        {Kvstore.SSTFileG, %{file: name}}
-      )
-
-    {:noreply, %{files: [{name, pid} | files]}}
-  end
-
-  def handle_cast({:remove, files}, %{files: all_files} = state) do
+  def handle_call({:remove, files}, _from, %{files: all_files} = state) do
     Logger.info("Removing SST files: #{inspect(files)}")
 
     Enum.each(files, fn file ->
@@ -85,6 +72,19 @@ defmodule Kvstore.SSTListG do
       end
     end)
 
-    {:noreply, %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}
+    {:reply, :ok,
+     %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}
+  end
+
+  def handle_cast({:add_level, name}, %{files: files}) do
+    Logger.info("Adding SST file: #{name}")
+
+    {:ok, pid} =
+      DynamicSupervisor.start_child(
+        Kvstore.SSTFileSupervisor,
+        {Kvstore.SSTFileG, %{file: name}}
+      )
+
+    {:noreply, %{files: [{name, pid} | files]}}
   end
 end

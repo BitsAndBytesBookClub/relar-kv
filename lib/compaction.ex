@@ -10,8 +10,6 @@ defmodule Kvstore.CompactionG do
   require Logger
 
   @ssts_path "db/sst"
-  @level0_path "db/lsm/0"
-  @new_level0_path "db/compacted/0"
   @max_ssts 4
 
   def start_link(args) do
@@ -32,30 +30,42 @@ defmodule Kvstore.CompactionG do
     if ssts < @max_ssts do
       {:noreply, %{state | ssts: ssts + 1}}
     else
-      Logger.info("Compacting SSTables")
-      sst_files = File.ls!(@ssts_path)
-      compact_ssts_into_level0(sst_files)
-
-      Kvstore.LSMTree.update_level(0)
-
-      Kvstore.TrashBin.empty()
-
-      File.rename!(@level0_path, Kvstore.TrashBin.path() <> "/" <> "0")
-      File.rename!(@new_level0_path, @level0_path)
-
-      Kvstore.TrashBin.empty()
-
-      Kvstore.SSTList.remove(sst_files)
-
-      Logger.info("Finished compacting SSTables")
+      Kvstore.Compaction.SSTToLevel0.compact()
       {:noreply, %{state | ssts: 0}}
     end
   end
+end
 
-  def compact_ssts_into_level0(sst_files) do
+defmodule Kvstore.Compaction.SSTToLevel0 do
+  require Logger
+
+  @ssts_path "db/sst"
+  @level0_path "db/lsm/0"
+  @new_level0_path "db/compacted/0"
+
+  def compact() do
+    Logger.info("Compacting SSTables")
+    sst_files = File.ls!(@ssts_path)
+    do_the_compaction(sst_files)
+
+    Kvstore.LSMTree.update_level(0)
+
+    Kvstore.TrashBin.empty()
+
+    File.rename!(@level0_path, Kvstore.TrashBin.path() <> "/" <> "0")
+    File.rename!(@new_level0_path, @level0_path)
+
+    Kvstore.TrashBin.empty()
+
+    Kvstore.SSTList.remove(sst_files)
+
+    Logger.info("Finished compacting SSTables")
+  end
+
+  def do_the_compaction(sst_files) do
     sst_data = get_sst_data(sst_files)
     lsm_data = get_lsm_data()
-    write_data = get_writ_data()
+    write_data = Compaction.Writer.data(@new_level0_path)
 
     combine_sst_and_lsm_keys(sst_data, lsm_data, write_data)
   end
@@ -78,19 +88,19 @@ defmodule Kvstore.CompactionG do
 
       {^key, ^key} ->
         Logger.info("Last key (#{key}) from SST was equal, writing to LSM Level 0")
-        write_data = write_to_level0(write_data, key, value)
+        write_data = Compaction.Writer.write(write_data, key, value)
         combine(write_data, [], data, :lsm, new_key, new_value)
 
       {^key, ^new_key} when key < new_key ->
         Logger.info("Writing old key: #{key}, lost to #{new_key} to LSM Level 0")
-        write_data = write_to_level0(write_data, key, value)
-        write_data = write_to_level0(write_data, new_key, new_value)
+        write_data = Compaction.Writer.write(write_data, key, value)
+        write_data = Compaction.Writer.write(write_data, new_key, new_value)
 
         drain_lsm(write_data, data)
 
       {^key, ^new_key} when key > new_key ->
         Logger.info("Writing lsm key: #{new_key} lost to #{key} to LSM Level 0")
-        write_data = write_to_level0(write_data, new_key, new_value)
+        write_data = Compaction.Writer.write(write_data, new_key, new_value)
         combine(write_data, [], data, :lsm, key, value)
     end
   end
@@ -98,7 +108,7 @@ defmodule Kvstore.CompactionG do
   defp combine(write_data, sst_data, [], _, _, _) do
     {data, key, value} = next_from_sst(sst_data)
     Logger.info("Writing remaining sst data to LSM Level 0, key: #{key}, value: #{value}")
-    write_data = write_to_level0(write_data, key, value)
+    write_data = Compaction.Writer.write(write_data, key, value)
     combine(write_data, data, [], :sst, nil, nil)
   end
 
@@ -118,17 +128,17 @@ defmodule Kvstore.CompactionG do
     case {sst_key, lsm_key} do
       {key, key} ->
         Logger.info("Keys are equal, writing sst key: #{sst_key} to LSM Level 0")
-        write_data = write_to_level0(write_data, key, sst_value)
+        write_data = Compaction.Writer.write(write_data, key, sst_value)
         combine(write_data, sst_data, lsm_data, :both, nil, nil)
 
       {s, l} when s < l ->
         Logger.info("Writing sst key: #{sst_key}, lost to #{lsm_key} to LSM Level 0")
-        write_data = write_to_level0(write_data, sst_key, sst_value)
+        write_data = Compaction.Writer.write(write_data, sst_key, sst_value)
         combine(write_data, sst_data, lsm_data, :sst, lsm_key, lsm_value)
 
       {s, l} when s > l ->
         Logger.info("Writing lsm key: #{lsm_key} lost to #{sst_key} to LSM Level 0")
-        write_data = write_to_level0(write_data, lsm_key, lsm_value)
+        write_data = Compaction.Writer.write(write_data, lsm_key, lsm_value)
         combine(write_data, sst_data, lsm_data, :lsm, sst_key, sst_value)
     end
   end
@@ -146,23 +156,8 @@ defmodule Kvstore.CompactionG do
 
       _ ->
         Logger.info("Draining lsm key: #{key} to LSM Level 0")
-        write_data = write_to_level0(write_data, key, value)
+        write_data = Compaction.Writer.write(write_data, key, value)
         drain_lsm(write_data, data)
-    end
-  end
-
-  defp write_to_level0({fd, count, letter}, key, value) do
-    case count > 10 do
-      true ->
-        File.close(fd)
-        next_letter = NextLetter.get_next_letter(letter)
-        {:ok, fd} = File.open(@new_level0_path <> "/#{next_letter}", [:write, :utf8])
-        IO.write(fd, "#{key},#{value}")
-        {fd, 1, next_letter}
-
-      false ->
-        IO.write(fd, "#{key},#{value}")
-        {fd, count + 1, letter}
     end
   end
 
@@ -191,13 +186,6 @@ defmodule Kvstore.CompactionG do
     end
   end
 
-  defp get_writ_data() do
-    File.mkdir_p!(@new_level0_path)
-
-    {:ok, fd} = File.open(@new_level0_path <> "/a", [:write, :utf8])
-    {fd, 0, "a"}
-  end
-
   defp get_lsm_data() do
     files =
       File.ls!(@level0_path)
@@ -222,6 +210,7 @@ defmodule Kvstore.CompactionG do
       ssts
       |> Enum.map(&File.open(@ssts_path <> "/" <> &1, [:read]))
       |> Enum.map(fn {:ok, fd} -> fd end)
+      |> dbg()
 
     streams = Enum.map(file_descriptors, &IO.stream(&1, :line))
 
@@ -269,6 +258,34 @@ defmodule Kvstore.CompactionG do
     data = Enum.filter(data, fn x -> x != nil end)
 
     {data, key, value}
+  end
+end
+
+defmodule Compaction.Writer do
+  def data(path) do
+    File.mkdir_p!(path)
+
+    {:ok, fd} = File.open(path <> "/a", [:write, :utf8])
+    {fd, 0, "a", path}
+  end
+
+  def write(data, nil, nil) do
+    data
+  end
+
+  def write({fd, count, letter, path}, key, value) do
+    case count > 10 do
+      true ->
+        File.close(fd)
+        next_letter = NextLetter.get_next_letter(letter)
+        {:ok, fd} = File.open(path <> "/#{next_letter}", [:write, :utf8])
+        IO.write(fd, "#{key},#{value}")
+        {fd, 1, next_letter, path}
+
+      false ->
+        IO.write(fd, "#{key},#{value}")
+        {fd, count + 1, letter, path}
+    end
   end
 end
 

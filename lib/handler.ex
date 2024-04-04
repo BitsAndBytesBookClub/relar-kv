@@ -11,8 +11,8 @@ defmodule KV do
     Enum.random([:h1, :h2])
   end
 
-  def add_10_random_keys() do
-    for _ <- 1..9 do
+  def add_random_keys(n) do
+    for _ <- 1..n do
       KV.set(Random.key(), Random.value())
     end
   end
