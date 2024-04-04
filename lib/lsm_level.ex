@@ -41,22 +41,24 @@ defmodule Kvstore.LSMLevelG do
       end)
 
     bounds =
-      Enum.map(parts, fn pid ->
-        Logger.info("LSMLevel | Getting bounds for LSMLevel file: #{inspect(pid)}")
-        Kvstore.LSMPart.first(pid)
+      Enum.zip(files, parts)
+      |> Enum.map(fn {file, pid} ->
+        bound = Kvstore.LSMPart.first(pid)
+        Logger.info("LSMLevel | Bounds for LSMLevel file: #{file}, bound: #{bound}")
+        bound
       end)
 
     Logger.info(
       "LSMLevel | Files in LSMLevel #{level}: #{inspect(files)}, with bounds: #{inspect(bounds)}"
     )
 
-    {:ok, %{path: path, files: files, bounds: bounds, level: level}}
+    {:ok, %{files: files, bounds: bounds, level: level, parts: parts}}
   end
 
   def handle_call(
         {:get_part, key},
         _from,
-        %{path: path, files: files, level: level, bounds: bounds} = state
+        %{files: files, level: level, bounds: bounds, parts: parts} = state
       ) do
     Logger.debug("Reading LSMLevel key: #{key}")
 
@@ -80,7 +82,7 @@ defmodule Kvstore.LSMLevelG do
               {:halt, i}
 
             [_, _, ^key] ->
-              {:halt, i + 1}
+              {:cont, i + 1}
 
             [^key, _, _] ->
               {:cont, nil}
@@ -94,7 +96,7 @@ defmodule Kvstore.LSMLevelG do
 
       i ->
         Logger.debug("Key in range for LSMLevel #{level}, file: #{Enum.at(files, i)}")
-        {:reply, path <> "/" <> level <> "/" <> Enum.at(files, i), state}
+        {:reply, Enum.at(parts, i), state}
     end
   end
 end

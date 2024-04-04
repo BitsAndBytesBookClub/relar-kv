@@ -69,10 +69,30 @@ defmodule Kvstore.CompactionG do
   end
 
   defp combine(write_data, [], lsm_data, _, key, value) do
-    Logger.info("Writing remaining lsm data to LSM Level 0, key: #{key}, value: #{value}")
-    write_data = write_to_level0(write_data, key, value)
+    Logger.info("No more SST data")
     {data, new_key, new_value} = next_from_lsm(lsm_data)
-    combine(write_data, [], data, :lsm, new_key, new_value)
+
+    case {key, new_key} do
+      {_, nil} ->
+        Logger.info("No more lsm data")
+
+      {^key, ^key} ->
+        Logger.info("Last key (#{key}) from SST was equal, writing to LSM Level 0")
+        write_data = write_to_level0(write_data, key, value)
+        combine(write_data, [], data, :lsm, new_key, new_value)
+
+      {^key, ^new_key} when key < new_key ->
+        Logger.info("Writing old key: #{key}, lost to #{new_key} to LSM Level 0")
+        write_data = write_to_level0(write_data, key, value)
+        write_data = write_to_level0(write_data, new_key, new_value)
+
+        drain_lsm(write_data, data)
+
+      {^key, ^new_key} when key > new_key ->
+        Logger.info("Writing lsm key: #{new_key} lost to #{key} to LSM Level 0")
+        write_data = write_to_level0(write_data, new_key, new_value)
+        combine(write_data, [], data, :lsm, key, value)
+    end
   end
 
   defp combine(write_data, sst_data, [], _, _, _) do
@@ -102,25 +122,33 @@ defmodule Kvstore.CompactionG do
         combine(write_data, sst_data, lsm_data, :both, nil, nil)
 
       {s, l} when s < l ->
-        Logger.info("Writing sst key: #{sst_key} to LSM Level 0")
+        Logger.info("Writing sst key: #{sst_key}, lost to #{lsm_key} to LSM Level 0")
         write_data = write_to_level0(write_data, sst_key, sst_value)
         combine(write_data, sst_data, lsm_data, :sst, lsm_key, lsm_value)
 
       {s, l} when s > l ->
-        Logger.info("Writing lsm key: #{lsm_key} to LSM Level 0")
+        Logger.info("Writing lsm key: #{lsm_key} lost to #{sst_key} to LSM Level 0")
         write_data = write_to_level0(write_data, lsm_key, lsm_value)
         combine(write_data, sst_data, lsm_data, :lsm, sst_key, sst_value)
     end
   end
 
-  defp write_to_level0(x, nil, nil) do
-    Logger.error("UNKNOWN WRITE, nil")
-    x
+  defp drain_lsm(_, []) do
+    nil
   end
 
-  defp write_to_level0(x, "", "") do
-    Logger.error("UNKNOWN WRITE, string")
-    x
+  defp drain_lsm(write_data, data) do
+    {data, key, value} = next_from_lsm(data)
+
+    case key do
+      nil ->
+        []
+
+      _ ->
+        Logger.info("Draining lsm key: #{key} to LSM Level 0")
+        write_data = write_to_level0(write_data, key, value)
+        drain_lsm(write_data, data)
+    end
   end
 
   defp write_to_level0({fd, count, letter}, key, value) do
