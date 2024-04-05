@@ -63,8 +63,8 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   end
 
   def do_the_compaction(sst_files) do
-    sst_data = get_sst_data(sst_files)
-    lsm_data = get_lsm_data()
+    sst_data = Compaction.SSTReader.data(sst_files, @ssts_path)
+    lsm_data = Compaction.LSMReader.data(@level0_path)
     write_data = Compaction.Writer.data(@new_level0_path)
 
     combine_sst_and_lsm_keys(sst_data, lsm_data, write_data)
@@ -80,7 +80,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
   defp combine(write_data, [], lsm_data, _, key, value) do
     Logger.info("No more SST data")
-    {data, new_key, new_value} = next_from_lsm(lsm_data)
+    {data, new_key, new_value} = Compaction.LSMReader.next(lsm_data)
 
     case {key, new_key} do
       {_, nil} ->
@@ -106,7 +106,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   end
 
   defp combine(write_data, sst_data, [], _, _, _) do
-    {data, key, value} = next_from_sst(sst_data)
+    {data, key, value} = Compaction.SSTReader.next(sst_data)
     Logger.info("Writing remaining sst data to LSM Level 0, key: #{key}, value: #{value}")
     write_data = Compaction.Writer.write(write_data, key, value)
     combine(write_data, data, [], :sst, nil, nil)
@@ -116,13 +116,13 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
     {{sst_data, sst_key, sst_value}, {lsm_data, lsm_key, lsm_value}} =
       case pull do
         :sst ->
-          {next_from_sst(sst_data), {lsm_data, prev_key, prev_val}}
+          {Compaction.SSTReader.next(sst_data), {lsm_data, prev_key, prev_val}}
 
         :lsm ->
-          {{sst_data, prev_key, prev_val}, next_from_lsm(lsm_data)}
+          {{sst_data, prev_key, prev_val}, Compaction.LSMReader.next(lsm_data)}
 
         :both ->
-          {next_from_sst(sst_data), next_from_lsm(lsm_data)}
+          {Compaction.SSTReader.next(sst_data), Compaction.LSMReader.next(lsm_data)}
       end
 
     case {sst_key, lsm_key} do
@@ -148,7 +148,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   end
 
   defp drain_lsm(write_data, data) do
-    {data, key, value} = next_from_lsm(data)
+    {data, key, value} = Compaction.LSMReader.next(data)
 
     case key do
       nil ->
@@ -158,133 +158,6 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
         Logger.info("Draining lsm key: #{key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, key, value)
         drain_lsm(write_data, data)
-    end
-  end
-
-  defp next_from_lsm([]) do
-    {[], nil, nil}
-  end
-
-  defp next_from_lsm(data) do
-    [stream | data_tail] = data
-
-    case Enum.take(stream, 1) do
-      [] ->
-        case data_tail do
-          [] ->
-            {[], nil, nil}
-
-          [next_stream | _] ->
-            [item] = Enum.take(next_stream, 1)
-            [key, value] = String.split(item, ",")
-            {data_tail, key, value}
-        end
-
-      [item] ->
-        [key, value] = String.split(item, ",")
-        {data, key, value}
-    end
-  end
-
-  defp get_lsm_data() do
-    files =
-      File.ls!(@level0_path)
-      |> Enum.sort()
-
-    file_descriptors =
-      files
-      |> Enum.map(&File.open(@level0_path <> "/" <> &1, [:read]))
-      |> Enum.map(fn {:ok, fd} -> fd end)
-
-    Enum.map(file_descriptors, &IO.stream(&1, :line))
-  end
-
-  defp get_sst_data(files) do
-    ssts =
-      files
-      |> Enum.map(&String.to_integer/1)
-      |> Enum.sort()
-      |> Enum.map(&Integer.to_string/1)
-
-    file_descriptors =
-      ssts
-      |> Enum.map(&File.open(@ssts_path <> "/" <> &1, [:read]))
-      |> Enum.map(fn {:ok, fd} -> fd end)
-      |> dbg()
-
-    streams = Enum.map(file_descriptors, &IO.stream(&1, :line))
-
-    elements =
-      Enum.map(streams, fn stream ->
-        stream
-        |> Enum.take(1)
-        |> hd
-        |> String.split(",")
-      end)
-
-    Enum.zip(elements, streams)
-  end
-
-  defp next_from_sst([]) do
-    {[], nil, nil}
-  end
-
-  defp next_from_sst(data) do
-    {[key, _], _} =
-      data
-      |> Enum.min_by(fn {[k, _], _} -> k end)
-
-    {[_, value], _} =
-      data
-      |> Enum.filter(fn {[k, _], _} -> k == key end)
-      |> List.last()
-
-    data =
-      data
-      |> Enum.with_index()
-      |> Enum.reduce(data, fn {{[k, _], stream}, idx}, acc ->
-        case k == key do
-          true ->
-            case Enum.take(stream, 1) do
-              [] -> List.replace_at(acc, idx, nil)
-              [item] -> List.replace_at(acc, idx, {String.split(item, ","), stream})
-            end
-
-          false ->
-            acc
-        end
-      end)
-
-    data = Enum.filter(data, fn x -> x != nil end)
-
-    {data, key, value}
-  end
-end
-
-defmodule Compaction.Writer do
-  def data(path) do
-    File.mkdir_p!(path)
-
-    {:ok, fd} = File.open(path <> "/a", [:write, :utf8])
-    {fd, 0, "a", path}
-  end
-
-  def write(data, nil, nil) do
-    data
-  end
-
-  def write({fd, count, letter, path}, key, value) do
-    case count > 10 do
-      true ->
-        File.close(fd)
-        next_letter = NextLetter.get_next_letter(letter)
-        {:ok, fd} = File.open(path <> "/#{next_letter}", [:write, :utf8])
-        IO.write(fd, "#{key},#{value}")
-        {fd, 1, next_letter, path}
-
-      false ->
-        IO.write(fd, "#{key},#{value}")
-        {fd, count + 1, letter, path}
     end
   end
 end

@@ -1,4 +1,6 @@
 defmodule KV do
+  require Logger
+
   def set(key, value) do
     GenServer.call(handler(), {:set, key, value})
   end
@@ -15,6 +17,30 @@ defmodule KV do
     for _ <- 1..n do
       KV.set(Random.key(), Random.value())
     end
+  end
+
+  def write_read_random_keys(n) do
+    data =
+      for _ <- 1..n do
+        key = Random.key()
+        value = Random.value()
+        {key, value}
+      end
+
+    Enum.each(data, fn {key, value} ->
+      KV.set(key, value)
+    end)
+
+    Enum.reduce_while(data, nil, fn {key, value}, _ ->
+      case KV.get(key) do
+        ^value ->
+          :timer.sleep(10)
+          {:cont, nil}
+
+        _ ->
+          {:halt, key}
+      end
+    end)
   end
 end
 
@@ -34,9 +60,15 @@ defmodule Kvstore.Handler do
   def from_sst(key) do
     Kvstore.SSTList.list()
     |> Enum.reduce_while(nil, fn sst, _ ->
-      case Kvstore.SSTFile.get(sst, key) do
-        nil -> {:cont, nil}
-        v -> {:halt, v}
+      try do
+        case Kvstore.SSTFile.get(sst, key) do
+          nil -> {:cont, nil}
+          v -> {:halt, v}
+        end
+      rescue
+        _ ->
+          Logger.info("Error reading SSTable: #{sst}")
+          {:halt, nil}
       end
     end)
   end
