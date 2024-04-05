@@ -64,7 +64,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
   def do_the_compaction(sst_files) do
     sst_data = Compaction.SSTReader.data(sst_files, @ssts_path)
-    lsm_data = Compaction.LSMReader.data(@level0_path)
+    lsm_data = Compaction.LSMReader.stream(@level0_path)
     write_data = Compaction.Writer.data(@new_level0_path)
 
     combine_sst_and_lsm_keys(sst_data, lsm_data, write_data)
@@ -80,7 +80,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
   defp combine(write_data, [], lsm_data, _, key, value) do
     Logger.info("No more SST data")
-    {data, new_key, new_value} = Compaction.LSMReader.next(lsm_data)
+    {new_key, new_value} = Compaction.LSMReader.next(lsm_data)
 
     case {key, new_key} do
       {_, nil} ->
@@ -89,19 +89,19 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
       {^key, ^key} ->
         Logger.info("Last key (#{key}) from SST was equal, writing to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, key, value)
-        combine(write_data, [], data, :lsm, new_key, new_value)
+        combine(write_data, [], lsm_data, :lsm, new_key, new_value)
 
       {^key, ^new_key} when key < new_key ->
         Logger.info("Writing old key: #{key}, lost to #{new_key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, key, value)
         write_data = Compaction.Writer.write(write_data, new_key, new_value)
 
-        drain_lsm(write_data, data)
+        drain_lsm(write_data, lsm_data)
 
       {^key, ^new_key} when key > new_key ->
         Logger.info("Writing lsm key: #{new_key} lost to #{key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, new_key, new_value)
-        combine(write_data, [], data, :lsm, key, value)
+        combine(write_data, [], lsm_data, :lsm, key, value)
     end
   end
 
@@ -113,10 +113,10 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   end
 
   defp combine(write_data, sst_data, lsm_data, pull, prev_key, prev_val) do
-    {{sst_data, sst_key, sst_value}, {lsm_data, lsm_key, lsm_value}} =
+    {{sst_data, sst_key, sst_value}, {lsm_key, lsm_value}} =
       case pull do
         :sst ->
-          {Compaction.SSTReader.next(sst_data), {lsm_data, prev_key, prev_val}}
+          {Compaction.SSTReader.next(sst_data), {prev_key, prev_val}}
 
         :lsm ->
           {{sst_data, prev_key, prev_val}, Compaction.LSMReader.next(lsm_data)}
@@ -126,6 +126,19 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
       end
 
     case {sst_key, lsm_key} do
+      {nil, nil} ->
+        Logger.info("Finished compacting SSTables")
+
+      {nil, _} ->
+        Logger.info("No more SST data")
+        write_data = Compaction.Writer.write(write_data, lsm_key, lsm_value)
+        combine(write_data, sst_data, lsm_data, :lsm, nil, nil)
+
+      {_, nil} ->
+        Logger.info("No more LSM data")
+        write_data = Compaction.Writer.write(write_data, sst_key, sst_value)
+        combine(write_data, sst_data, lsm_data, :sst, nil, nil)
+
       {key, key} ->
         Logger.info("Keys are equal, writing sst key: #{sst_key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, key, sst_value)
@@ -147,8 +160,8 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
     nil
   end
 
-  defp drain_lsm(write_data, data) do
-    {data, key, value} = Compaction.LSMReader.next(data)
+  defp drain_lsm(write_data, lsm_data) do
+    {key, value} = Compaction.LSMReader.next(lsm_data)
 
     case key do
       nil ->
@@ -157,7 +170,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
       _ ->
         Logger.info("Draining lsm key: #{key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, key, value)
-        drain_lsm(write_data, data)
+        drain_lsm(write_data, lsm_data)
     end
   end
 end

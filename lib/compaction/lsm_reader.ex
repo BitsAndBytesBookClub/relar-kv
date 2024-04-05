@@ -1,39 +1,25 @@
 defmodule Compaction.LSMReader do
-  def data(path) do
-    files =
-      File.ls!(path)
-      |> Enum.sort()
-
-    file_descriptors =
-      files
-      |> Enum.map(&File.open(path <> "/" <> &1, [:read]))
-      |> Enum.map(fn {:ok, fd} -> fd end)
-
-    Enum.map(file_descriptors, &IO.stream(&1, :line))
+  def stream(path) do
+    File.ls!(path)
+    |> Enum.sort()
+    |> Enum.map(&File.open(path <> "/" <> &1, [:read]))
+    |> Enum.map(fn {:ok, fd} -> fd end)
+    |> Enum.map(&IO.stream(&1, :line))
+    |> Stream.concat()
+    |> Stream.map(&String.split(&1, ","))
   end
 
   def next([]) do
     {[], nil, nil}
   end
 
-  def next(data) do
-    [stream | data_tail] = data
-
+  def next(stream) do
     case Enum.take(stream, 1) do
       [] ->
-        case data_tail do
-          [] ->
-            {[], nil, nil}
+        {nil, nil}
 
-          [next_stream | _] ->
-            [item] = Enum.take(next_stream, 1)
-            [key, value] = String.split(item, ",")
-            {data_tail, key, value}
-        end
-
-      [item] ->
-        [key, value] = String.split(item, ",")
-        {data, key, value}
+      [[key, value]] ->
+        {key, value}
     end
   end
 end
