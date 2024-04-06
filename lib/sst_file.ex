@@ -1,6 +1,19 @@
 defmodule Kvstore.SSTFile do
+  require Logger
+
   def get(sst, key) do
-    GenServer.call(sst, {:get, key})
+    try do
+      GenServer.call(sst, {:get, key})
+    catch
+      ArgumentError ->
+        # This error occurs if the pid is not a valid process.
+        Logger.info("Invalid SSTFile pid: #{inspect(sst)}")
+
+      :exit, reason ->
+        # Handle abrupt termination reasons.
+        Logger.info("SSTFile terminated: #{inspect(reason)}")
+        nil
+    end
   end
 end
 

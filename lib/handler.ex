@@ -31,14 +31,60 @@ defmodule KV do
       KV.set(key, value)
     end)
 
-    Enum.reduce_while(data, nil, fn {key, value}, _ ->
-      case KV.get(key) do
+    data
+    |> Enum.with_index()
+    |> Enum.reduce_while(nil, fn {{key, value}, i}, _ ->
+      v = KV.get(key)
+
+      case v do
         ^value ->
           :timer.sleep(10)
-          {:cont, nil}
+          {:cont, "!!!WORKED!!!"}
 
         _ ->
-          {:halt, key}
+          {:halt, "Failed #{key}(#{i}), got #{v}, wanted #{value}"}
+      end
+    end)
+  end
+
+  def do_the_test(n, i) do
+    keys =
+      for _ <- 1..n do
+        key = Random.key()
+        key
+      end
+
+    for _ <- 1..i do
+      increment(keys)
+    end
+
+    str_i = Integer.to_string(i)
+
+    res =
+      keys
+      |> Enum.map(fn key ->
+        case KV.get(key) do
+          nil -> "Key not"
+          ^str_i -> "good"
+          v -> "#{v}"
+        end
+      end)
+      |> Enum.reduce(%{}, fn v, acc ->
+        Map.update(acc, v, 1, &(&1 + 1))
+      end)
+
+    dbg(res)
+  end
+
+  def increment(keys) do
+    keys
+    |> Enum.each(fn key ->
+      case KV.get(key) do
+        nil ->
+          KV.set(key, "1")
+
+        v ->
+          KV.set(key, Integer.to_string(String.to_integer(v) + 1))
       end
     end)
   end
@@ -60,15 +106,9 @@ defmodule Kvstore.Handler do
   def from_sst(key) do
     Kvstore.SSTList.list()
     |> Enum.reduce_while(nil, fn sst, _ ->
-      try do
-        case Kvstore.SSTFile.get(sst, key) do
-          nil -> {:cont, nil}
-          v -> {:halt, v}
-        end
-      rescue
-        _ ->
-          Logger.info("Error reading SSTable: #{sst}")
-          {:halt, nil}
+      case Kvstore.SSTFile.get(sst, key) do
+        nil -> {:cont, nil}
+        v -> {:halt, v}
       end
     end)
   end

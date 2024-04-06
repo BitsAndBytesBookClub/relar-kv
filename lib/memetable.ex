@@ -31,7 +31,7 @@ defmodule Kvstore.MemetableG do
 
   @table_prefix :memetable
   @memetable_path "db/memetable"
-  @max_size 4
+  @max_size 100
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)

@@ -83,8 +83,6 @@ defmodule Kvstore.LSMTreeG do
       |> Enum.with_index()
       |> Enum.find(levels, fn {{l, _, _}, _} -> l == level end)
 
-    # |> dbg()
-
     case found do
       nil ->
         Logger.info("LSMTree | Starting LSMLevel: #{level}")
@@ -101,7 +99,6 @@ defmodule Kvstore.LSMTreeG do
         Logger.info("LSMTree | Stopping LSMLevel: #{level}, iteration: #{iteration}")
 
         DynamicSupervisor.which_children(Kvstore.LSMLevelSupervisor)
-        |> dbg()
 
         :ok = DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
 

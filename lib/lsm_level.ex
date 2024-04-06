@@ -68,8 +68,6 @@ defmodule Kvstore.LSMLevelG do
   def terminate(reason, %{parts: parts}) do
     Logger.info("LSMLevel | Terminating LSMLevel due to: #{inspect(reason)}")
 
-    dbg(parts)
-
     Enum.each(parts, fn pid ->
       DynamicSupervisor.terminate_child(Kvstore.LSMPartSupervisor, pid)
     end)
@@ -77,6 +75,14 @@ defmodule Kvstore.LSMLevelG do
 
   def handle_call({:get_part, _key}, _from, %{files: []} = state) do
     {:reply, nil, state}
+  end
+
+  def handle_call({:get_part, key}, _from, %{files: ["a"], parts: [pid], bounds: [first]} = state) do
+    if key >= first do
+      {:reply, pid, state}
+    else
+      {:reply, nil, state}
+    end
   end
 
   def handle_call(
