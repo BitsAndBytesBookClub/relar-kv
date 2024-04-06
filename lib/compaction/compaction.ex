@@ -38,7 +38,7 @@ defmodule Kvstore.CompactionG do
       end
     end)
 
-    {:ok, %{ssts: ssts, lsms: lsms}}
+    {:ok, %{ssts: ssts}}
   end
 
   def handle_cast(:add_sst, %{ssts: ssts} = state) do
@@ -46,31 +46,26 @@ defmodule Kvstore.CompactionG do
       {:noreply, %{state | ssts: ssts + 1}}
     else
       Kvstore.Compaction.SSTToLevel0.compact()
+      GenServer.cast(:compaction, {:add_lsm_file, "0"})
       {:noreply, %{state | ssts: 0}}
     end
   end
 
-  def handle_cast({:add_lsm_file, level}, %{lsms: lsms} = state) do
-    {_, count} = Enum.find(lsms, fn {l, _} -> l == level end)
+  def handle_cast({:add_lsm_file, level}, state) do
+    count = Enum.count(File.ls!(@lsm_path <> "/" <> level))
 
-    new_count =
-      if count > 10 do
-        Kvstore.Compaction.LSM.compact(level)
-        0
-      else
-        count + 1
-      end
+    if count > 10 do
+      next_level =
+        level
+        |> String.to_integer()
+        |> Kernel.+(1)
+        |> Integer.to_string()
 
-    lsms =
-      Enum.map(lsms, fn {l, c} ->
-        if l == level do
-          {l, new_count}
-        else
-          {l, c}
-        end
-      end)
+      Kvstore.Compaction.LSM.compact(level)
+      GenServer.cast(:compaction, {:add_lsm_file, next_level})
+    end
 
-    {:noreply, %{state | lsms: lsms}}
+    {:noreply, state}
   end
 end
 
@@ -81,7 +76,31 @@ defmodule Kvstore.Compaction.LSM do
 
   def compact(level) do
     Logger.info("Compacting LSM Level #{level}")
+
     do_the_compaction(level)
+
+    next_level =
+      level
+      |> String.to_integer()
+      |> Kernel.+(1)
+      |> Integer.to_string()
+
+    Kvstore.LSMTree.update_level_from_compaction(next_level)
+
+    Kvstore.TrashBin.empty()
+
+    File.rename!(@path <> next_level, Kvstore.TrashBin.path() <> "/" <> next_level)
+    File.rename!("db/compacted/lsm/" <> next_level, @path <> next_level)
+
+    File.rename!(@path <> level, Kvstore.TrashBin.path() <> "/" <> level)
+
+    File.mkdir_p!(@path <> level)
+
+    Kvstore.TrashBin.empty()
+
+    Kvstore.LSMTree.update_level_from_lsm(level)
+
+    Logger.info("Finished compacting LSM Level #{level}")
   end
 
   defp do_the_compaction(level) do
@@ -97,7 +116,18 @@ defmodule Kvstore.Compaction.LSM do
 
     lsm_b = Compaction.LSMReader.stream(@path <> next_level)
 
-    wd = Compaction.Writer.data("db/compacted/lsm/#{next_level}")
+    max_count =
+      level
+      |> String.to_integer()
+      |> Kernel.+(1)
+      |> Kernel.*(10)
+      |> Kernel.*(10)
+
+    wd =
+      Compaction.Writer.data(
+        "db/compacted/lsm/#{next_level}",
+        max_count
+      )
 
     combine(wd, lsm_a, lsm_b, :both, nil, nil)
   end
@@ -120,27 +150,25 @@ defmodule Kvstore.Compaction.LSM do
         Logger.info("Finished compacting LSM Level")
 
       {nil, _} ->
-        Logger.info("No more A data")
         wd = Compaction.Writer.write(wd, b_k, b_v)
         combine(wd, a, b, :b, nil, nil)
 
       {_, nil} ->
-        Logger.info("No more B data")
         wd = Compaction.Writer.write(wd, a_k, a_v)
         combine(wd, a, b, :a, nil, nil)
 
       {key, key} ->
-        Logger.info("Keys are equal, writing A key: #{a_k} to LSM Level")
+        # Logger.info("Keys are equal, writing A key: #{a_k} to LSM Level")
         wd = Compaction.Writer.write(wd, key, a_v)
         combine(wd, a, b, :both, nil, nil)
 
-      {a, b} when a < b ->
-        Logger.info("Writing A key: #{a_k}, lost to #{b_k} to LSM Level")
+      {a_key, b_key} when a_key < b_key ->
+        # Logger.info("Writing A key: #{a_k}, lost to #{b_k} to LSM Level")
         wd = Compaction.Writer.write(wd, a_k, a_v)
         combine(wd, a, b, :a, b_k, b_v)
 
-      {a, b} when a > b ->
-        Logger.info("Writing B key: #{b_k} lost to #{a_k} to LSM Level")
+      {a_key, b_key} when a_key > b_key ->
+        # Logger.info("Writing B key: #{b_k} lost to #{a_k} to LSM Level")
         wd = Compaction.Writer.write(wd, b_k, b_v)
         combine(wd, a, b, :b, a_k, a_v)
     end
@@ -152,14 +180,14 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
   @ssts_path "db/sst"
   @level0_path "db/lsm/0"
-  @new_level0_path "db/compacted/0"
+  @new_level0_path "db/compacted/lsm/0"
 
   def compact() do
     Logger.info("Compacting SSTables")
     sst_files = File.ls!(@ssts_path)
     do_the_compaction(sst_files)
 
-    Kvstore.LSMTree.update_level(0)
+    Kvstore.LSMTree.update_level_from_compaction(0)
 
     Kvstore.TrashBin.empty()
 
@@ -203,27 +231,25 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
         Logger.info("Finished compacting SSTables")
 
       {nil, _} ->
-        Logger.info("No more SST data")
         write_data = Compaction.Writer.write(write_data, lsm_key, lsm_value)
         combine(write_data, sst_data, lsm_data, :lsm, nil, nil)
 
       {_, nil} ->
-        Logger.info("No more LSM data")
         write_data = Compaction.Writer.write(write_data, sst_key, sst_value)
         combine(write_data, sst_data, lsm_data, :sst, nil, nil)
 
       {key, key} ->
-        Logger.info("Keys are equal, writing sst key: #{sst_key} to LSM Level 0")
+        # Logger.info("Keys are equal, writing sst key: #{sst_key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, key, sst_value)
         combine(write_data, sst_data, lsm_data, :both, nil, nil)
 
       {s, l} when s < l ->
-        Logger.info("Writing sst key: #{sst_key}, lost to #{lsm_key} to LSM Level 0")
+        # Logger.info("Writing sst key: #{sst_key}, lost to #{lsm_key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, sst_key, sst_value)
         combine(write_data, sst_data, lsm_data, :sst, lsm_key, lsm_value)
 
       {s, l} when s > l ->
-        Logger.info("Writing lsm key: #{lsm_key} lost to #{sst_key} to LSM Level 0")
+        # Logger.info("Writing lsm key: #{lsm_key} lost to #{sst_key} to LSM Level 0")
         write_data = Compaction.Writer.write(write_data, lsm_key, lsm_value)
         combine(write_data, sst_data, lsm_data, :lsm, sst_key, sst_value)
     end

@@ -29,7 +29,7 @@ defmodule Kvstore.SSTWriterG do
 
     :ets.foldl(
       fn {key, value}, _ ->
-        Logger.debug("foldl #{inspect(table)}, key: #{key}, value: #{value}")
+        # Logger.debug("foldl #{inspect(table)}, key: #{key}, value: #{value}")
         IO.write(file_descriptor, "#{key},#{value}\n")
       end,
       nil,

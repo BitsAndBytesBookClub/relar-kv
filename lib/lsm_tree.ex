@@ -1,14 +1,25 @@
 defmodule Kvstore.LSMTree do
+  @compaction_path "db/compacted/lsm"
+  @lsm_path "db/lsm"
+
   def get_levels() do
     GenServer.call(Kvstore.LSMTreeG, {:get_levels})
   end
 
-  def update_level(level) when is_integer(level) do
-    GenServer.call(Kvstore.LSMTreeG, {:update_level, Integer.to_string(level)})
+  def update_level_from_compaction(level) when is_integer(level) do
+    GenServer.call(Kvstore.LSMTreeG, {:update_level, Integer.to_string(level), @compaction_path})
   end
 
-  def update_level(level) when is_binary(level) do
-    GenServer.call(Kvstore.LSMTreeG, {:update_level, level})
+  def update_level_from_compaction(level) when is_binary(level) do
+    GenServer.call(Kvstore.LSMTreeG, {:update_level, level, @compaction_path})
+  end
+
+  def update_level_from_lsm(level) when is_integer(level) do
+    GenServer.call(Kvstore.LSMTreeG, {:update_level, Integer.to_string(level), @lsm_path})
+  end
+
+  def update_level_from_lsm(level) when is_binary(level) do
+    GenServer.call(Kvstore.LSMTreeG, {:update_level, level, @lsm_path})
   end
 end
 
@@ -18,7 +29,6 @@ defmodule Kvstore.LSMTreeG do
   require Logger
 
   @path "db/lsm"
-  @compaction_path "db/compacted"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -63,13 +73,14 @@ defmodule Kvstore.LSMTreeG do
     {:reply, levels, state}
   end
 
-  def handle_call({:update_level, level}, _from, %{levels: levels} = state) do
+  def handle_call({:update_level, level, path}, _from, %{levels: levels} = state) do
     Logger.info("LSMTree | Updating LSMLevel: #{inspect(level)}, with levels: #{inspect(levels)}")
 
     found =
       levels
       |> Enum.with_index()
       |> Enum.find(levels, fn {{l, _, _}, _} -> l == level end)
+      |> dbg()
 
     case found do
       nil ->
@@ -78,7 +89,7 @@ defmodule Kvstore.LSMTreeG do
         {:ok, new_pid} =
           DynamicSupervisor.start_child(
             Kvstore.LSMLevelSupervisor,
-            {Kvstore.LSMLevelG, %{level: level, iteration: 0, path: @compaction_path}}
+            {Kvstore.LSMLevelG, %{level: level, iteration: 0, path: path}}
           )
 
         {:noreply, %{state | levels: levels ++ [{level, 0, new_pid}]}}
@@ -90,7 +101,7 @@ defmodule Kvstore.LSMTreeG do
         {:ok, new_pid} =
           DynamicSupervisor.start_child(
             Kvstore.LSMLevelSupervisor,
-            {Kvstore.LSMLevelG, %{level: level, iteration: iteration + 1, path: @compaction_path}}
+            {Kvstore.LSMLevelG, %{level: level, iteration: iteration + 1, path: path}}
           )
 
         {:reply, :ok,

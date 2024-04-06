@@ -13,7 +13,7 @@ defmodule Kvstore.LSMLevelG do
 
   require Logger
 
-  def start_link(%{level: level, iteration: i} = args) do
+  def start_link(%{level: level, iteration: i, path: _path} = args) do
     name = "level" <> level <> "_" <> Integer.to_string(i)
 
     Logger.info("LSMLevel | Starting: #{name}")
@@ -42,9 +42,9 @@ defmodule Kvstore.LSMLevelG do
 
     bounds =
       Enum.zip(files, parts)
-      |> Enum.map(fn {file, pid} ->
+      |> Enum.map(fn {_file, pid} ->
         bound = Kvstore.LSMPart.first(pid)
-        Logger.info("LSMLevel | Bounds for LSMLevel file: #{file}, bound: #{bound}")
+        # Logger.info("LSMLevel | Bounds for LSMLevel file: #{file}, bound: #{bound}")
         bound
       end)
 

@@ -32,16 +32,20 @@ defmodule Kvstore.LSMPartG do
   def init(%{file: file, path: path}) do
     {:ok, fd} = File.open(path <> "/" <> file, [:read])
 
-    first_line =
+    data =
       IO.stream(fd, :line)
       |> Enum.take(1)
-      |> hd
 
-    [first, _] = String.split(first_line, ",")
+    case data do
+      [] ->
+        Logger.info("Empty LSMPart: #{path}/#{file}")
+        {:ok, %{file: file, path: path, fd: fd, first: nil}}
 
-    Logger.info("Opening LSMPart: #{path}/#{file}, first: #{first}")
-
-    {:ok, %{file: file, path: path, fd: fd, first: first}}
+      [first_line] ->
+        [first, _] = String.split(first_line, ",")
+        Logger.info("Opening LSMPart: #{path}/#{file}, first: #{first}")
+        {:ok, %{file: file, path: path, fd: fd, first: first}}
+    end
   end
 
   def handle_call({:get, key}, _from, %{fd: fd} = state) do
