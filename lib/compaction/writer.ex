@@ -1,5 +1,5 @@
 defmodule Compaction.Writer do
-  def data(path, count \\ 10) do
+  def data(path, count \\ 100) do
     File.mkdir_p!(path)
 
     {:ok, fd} = File.open(path <> "/a", [:write, :utf8])
@@ -23,5 +23,9 @@ defmodule Compaction.Writer do
         IO.write(fd, "#{key},#{value}")
         {fd, count + 1, letter, path, max_count}
     end
+  end
+
+  def close({fd, _, _, _, _}) do
+    File.close(fd)
   end
 end

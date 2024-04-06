@@ -120,8 +120,7 @@ defmodule Kvstore.Compaction.LSM do
       level
       |> String.to_integer()
       |> Kernel.+(1)
-      |> Kernel.*(10)
-      |> Kernel.*(10)
+      |> Kernel.*(1000)
 
     wd =
       Compaction.Writer.data(
@@ -130,6 +129,8 @@ defmodule Kvstore.Compaction.LSM do
       )
 
     combine(wd, lsm_a, lsm_b, :both, nil, nil)
+
+    Compaction.Writer.close(wd)
   end
 
   def combine(wd, a, b, pull, prev_k, prev_v) do
@@ -207,6 +208,8 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
     write_data = Compaction.Writer.data(@new_level0_path)
 
     combine_sst_and_lsm_keys(sst_data, lsm_data, write_data)
+
+    Compaction.Writer.close(write_data)
   end
 
   defp combine_sst_and_lsm_keys(sst_data, lsm_data, write_data) do

@@ -77,9 +77,9 @@ defmodule Kvstore.MemetableG do
   def handle_call(
         {:set, key, value},
         _from,
-        %{f: file, count: count, table: table, old_table: old_table} = state
+        %{f: fd, count: count, table: table, old_table: old_table} = state
       ) do
-    :ok = IO.write(file, "#{key},#{value}\n")
+    :ok = IO.write(fd, "#{key},#{value}\n")
     true = :ets.insert(table, {key, value})
 
     case [count, old_table] do
@@ -93,11 +93,11 @@ defmodule Kvstore.MemetableG do
     {:reply, :ok, %{state | count: count + 1}}
   end
 
-  def handle_cast({:roll}, %{f: file, table: table, id: id}) do
+  def handle_cast({:roll}, %{f: fd, table: table, id: id}) do
     Logger.info("Rolling memetable #{id}")
     new_table = create_new_table(id + 1)
     write_memetable_to_sst(table)
-    :ok = File.close(file)
+    :ok = File.close(fd)
     :ok = File.rm(@memetable_path)
     {:ok, file_descriptor} = File.open(@memetable_path, [:write, :append])
 

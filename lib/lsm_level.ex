@@ -9,9 +9,17 @@ defmodule Kvstore.LSMLevel do
 end
 
 defmodule Kvstore.LSMLevelG do
-  use DynamicSupervisor
+  use GenServer
 
   require Logger
+
+  def child_spec(args) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [args]},
+      type: :supervisor
+    }
+  end
 
   def start_link(%{level: level, iteration: i, path: _path} = args) do
     name = "level" <> level <> "_" <> Integer.to_string(i)
@@ -22,6 +30,8 @@ defmodule Kvstore.LSMLevelG do
   end
 
   def init(%{level: level, iteration: i, path: path}) do
+    Process.flag(:trap_exit, true)
+
     full_path = "#{path}/#{level}"
 
     files =
@@ -53,6 +63,20 @@ defmodule Kvstore.LSMLevelG do
     )
 
     {:ok, %{files: files, bounds: bounds, level: level, parts: parts}}
+  end
+
+  def terminate(reason, %{parts: parts}) do
+    Logger.info("LSMLevel | Terminating LSMLevel due to: #{inspect(reason)}")
+
+    dbg(parts)
+
+    Enum.each(parts, fn pid ->
+      DynamicSupervisor.terminate_child(Kvstore.LSMPartSupervisor, pid)
+    end)
+  end
+
+  def handle_call({:get_part, _key}, _from, %{files: []} = state) do
+    {:reply, nil, state}
   end
 
   def handle_call(

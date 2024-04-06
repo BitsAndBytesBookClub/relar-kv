@@ -67,7 +67,7 @@ defmodule Kvstore.SSTListG do
           Logger.error("File not found: #{file}")
 
         {_, pid} ->
-          DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor, pid)
+          :ok = DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor, pid)
           File.rm!(@path <> "/" <> file)
       end
     end)

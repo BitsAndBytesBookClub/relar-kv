@@ -35,6 +35,8 @@ defmodule Kvstore.LSMTreeG do
   end
 
   def init(_) do
+    Process.flag(:trap_exit, true)
+
     levels =
       File.ls!(@path)
       |> Enum.map(&String.to_integer/1)
@@ -43,7 +45,7 @@ defmodule Kvstore.LSMTreeG do
 
     pids =
       Enum.map(levels, fn level ->
-        Logger.info("LSMTree | Starting LSMLevel: #{level}")
+        # Logger.info("LSMTree | Starting LSMLevel: #{level}")
 
         {:ok, pid} =
           DynamicSupervisor.start_child(
@@ -80,7 +82,8 @@ defmodule Kvstore.LSMTreeG do
       levels
       |> Enum.with_index()
       |> Enum.find(levels, fn {{l, _, _}, _} -> l == level end)
-      |> dbg()
+
+    # |> dbg()
 
     case found do
       nil ->
@@ -96,12 +99,18 @@ defmodule Kvstore.LSMTreeG do
 
       {{_, iteration, pid}, _} ->
         Logger.info("LSMTree | Stopping LSMLevel: #{level}, iteration: #{iteration}")
-        DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
+
+        DynamicSupervisor.which_children(Kvstore.LSMLevelSupervisor)
+        |> dbg()
+
+        :ok = DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
+
+        args = %{level: level, iteration: iteration + 1, path: path}
 
         {:ok, new_pid} =
           DynamicSupervisor.start_child(
             Kvstore.LSMLevelSupervisor,
-            {Kvstore.LSMLevelG, %{level: level, iteration: iteration + 1, path: path}}
+            Kvstore.LSMLevelG.child_spec(args)
           )
 
         {:reply, :ok,
@@ -117,5 +126,11 @@ defmodule Kvstore.LSMTreeG do
                end)
          }}
     end
+  end
+
+  def terminate(_reason, %{levels: levels}) do
+    Enum.each(levels, fn {_, _, pid} ->
+      DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
+    end)
   end
 end

@@ -16,6 +16,7 @@ defmodule Kvstore.SSTFileG do
   end
 
   def init(%{file: file}) do
+    Process.flag(:trap_exit, true)
     {:ok, fd} = File.open(@path <> "/" <> file, [:read])
     {:ok, %{fd: fd, file: file}}
   end
@@ -39,6 +40,12 @@ defmodule Kvstore.SSTFileG do
         [_, v] = line
         {:reply, String.trim_trailing(v, "\n"), state}
     end
+  end
+
+  def terminate(reason, %{fd: fd}) do
+    Logger.info("Closing SST file #{inspect(reason)}")
+    :ok = File.close(fd)
+    :ok
   end
 end
 

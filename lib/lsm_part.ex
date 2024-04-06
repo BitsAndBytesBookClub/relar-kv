@@ -30,6 +30,8 @@ defmodule Kvstore.LSMPartG do
   end
 
   def init(%{file: file, path: path}) do
+    Process.flag(:trap_exit, true)
+
     {:ok, fd} = File.open(path <> "/" <> file, [:read])
 
     data =
@@ -70,6 +72,12 @@ defmodule Kvstore.LSMPartG do
 
   def handle_call(:first, _from, %{first: first} = state) do
     {:reply, first, state}
+  end
+
+  def terminate(_reason, %{fd: fd}) do
+    Logger.info("LSMPart | Closing LSMPart")
+    :ok = File.close(fd)
+    :ok
   end
 end
 
