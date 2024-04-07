@@ -4,7 +4,7 @@ defmodule Kvstore.SSTList do
   end
 
   def add(name) do
-    GenServer.cast(Kvstore.SSTListG, {:add_level, name})
+    GenServer.call(Kvstore.SSTListG, {:add_level, name})
   end
 
   def remove(files) do
@@ -76,7 +76,7 @@ defmodule Kvstore.SSTListG do
      %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}
   end
 
-  def handle_cast({:add_level, name}, %{files: files}) do
+  def handle_call({:add_level, name}, _from, %{files: files}) do
     Logger.info("Adding SST file: #{name}")
 
     {:ok, pid} =
@@ -85,6 +85,6 @@ defmodule Kvstore.SSTListG do
         {Kvstore.SSTFileG, %{file: name}}
       )
 
-    {:noreply, %{files: [{name, pid} | files]}}
+    {:reply, :ok, %{files: [{name, pid} | files]}}
   end
 end
