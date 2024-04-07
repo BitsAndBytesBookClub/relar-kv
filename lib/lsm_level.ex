@@ -1,6 +1,19 @@
 defmodule Kvstore.LSMLevel do
+  require Logger
+
   def get_part({_, _, pid}, key) do
-    GenServer.call(pid, {:get_part, key})
+    try do
+      GenServer.call(pid, {:get_part, key})
+    catch
+      ArgumentError ->
+        # This error occurs if the pid is not a valid process.
+        Logger.info("Invalid LSMLevel pid: #{inspect(pid)}")
+
+      :exit, reason ->
+        # Handle abrupt termination reasons.
+        Logger.info("LSMLevel terminated: #{inspect(reason)}")
+        nil
+    end
   end
 
   def stop(pid) do

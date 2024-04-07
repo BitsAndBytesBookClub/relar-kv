@@ -38,7 +38,6 @@ defmodule KV do
 
       case v do
         ^value ->
-          :timer.sleep(10)
           {:cont, "!!!WORKED!!!"}
 
         _ ->
@@ -49,9 +48,8 @@ defmodule KV do
 
   def do_the_test(n, i) do
     keys =
-      for _ <- 1..n do
-        key = Random.key()
-        key
+      for nn <- 1..n do
+        Integer.to_string(nn)
       end
 
     for _ <- 1..i do
