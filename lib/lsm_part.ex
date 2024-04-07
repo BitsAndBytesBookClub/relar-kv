@@ -7,7 +7,7 @@ defmodule Kvstore.LSMPart do
   end
 
   def get(part, key) do
-    Logger.info("Getting key: #{key} from LSMPart: #{inspect(part)}")
+    # Logger.info("Getting key: #{key} from LSMPart: #{inspect(part)}")
     GenServer.call(part, {:get, key})
   end
 

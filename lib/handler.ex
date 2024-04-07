@@ -132,7 +132,7 @@ defmodule Kvstore.Handler do
     val =
       case val do
         nil ->
-          Logger.info("Key not found in memetable: #{key}")
+          # Logger.info("Key not found in memetable: #{key}")
 
           from_sst(key)
 
@@ -143,7 +143,7 @@ defmodule Kvstore.Handler do
     val =
       case val do
         nil ->
-          Logger.info("Key not found in SSTables: #{key}")
+          # Logger.info("Key not found in SSTables: #{key}")
 
           from_lsm(key)
 

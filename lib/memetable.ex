@@ -63,7 +63,8 @@ defmodule Kvstore.MemetableG do
        count: count,
        table: table,
        id: id,
-       old_table: nil
+       old_table: nil,
+       called_roll: false
      }}
   end
 
@@ -77,20 +78,20 @@ defmodule Kvstore.MemetableG do
   def handle_call(
         {:set, key, value},
         _from,
-        %{f: fd, count: count, table: table, old_table: old_table} = state
+        %{f: fd, count: count, table: table, old_table: old_table, called_roll: called_roll} =
+          state
       ) do
     :ok = IO.write(fd, "#{key},#{value}\n")
     true = :ets.insert(table, {key, value})
 
-    case [count, old_table] do
-      [n, nil] when n > @max_size ->
+    case [count, old_table, called_roll] do
+      [n, nil, false] when n > @max_size ->
         GenServer.cast(__MODULE__, {:roll})
+        {:reply, :ok, %{state | count: count + 1, called_roll: true}}
 
       _ ->
-        :ok
+        {:reply, :ok, %{state | count: count + 1}}
     end
-
-    {:reply, :ok, %{state | count: count + 1}}
   end
 
   def handle_cast({:roll}, %{f: fd, table: table, id: id}) do
@@ -107,7 +108,8 @@ defmodule Kvstore.MemetableG do
        count: 0,
        table: new_table,
        old_table: table,
-       id: id + 1
+       id: id + 1,
+       called_roll: false
      }}
   end
 
