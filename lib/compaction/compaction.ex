@@ -116,11 +116,11 @@ defmodule Kvstore.Compaction.LSM do
 
     lsm_b = Compaction.LSMReader.stream(@path <> next_level)
 
-    max_count =
+    next_level_i =
       level
       |> String.to_integer()
-      |> Kernel.+(1)
-      |> Kernel.*(1000)
+
+    max_count = :math.pow(10, next_level_i + 3)
 
     wd =
       Compaction.Writer.data(

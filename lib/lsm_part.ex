@@ -51,7 +51,7 @@ defmodule Kvstore.LSMPartG do
   end
 
   def handle_call({:get, key}, _from, %{fd: fd} = state) do
-    Logger.debug("Reading LSMPart key: #{key}")
+    # Logger.debug("Reading LSMPart key: #{key}")
 
     :file.position(fd, {:bof, 0})
 
@@ -75,7 +75,7 @@ defmodule Kvstore.LSMPartG do
   end
 
   def terminate(_reason, %{fd: fd}) do
-    Logger.info("LSMPart | Closing LSMPart")
+    # Logger.info("LSMPart | Closing LSMPart")
     :ok = File.close(fd)
     :ok
   end
