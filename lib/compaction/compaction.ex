@@ -52,7 +52,10 @@ defmodule Kvstore.CompactionG do
   end
 
   def handle_cast({:add_lsm_file, level}, state) do
-    count = Enum.count(File.ls!(@lsm_path <> "/" <> level))
+    count =
+      (@lsm_path <> "/" <> level)
+      |> File.ls!()
+      |> Enum.count()
 
     if count > 10 do
       next_level =
@@ -185,7 +188,13 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
   def compact() do
     Logger.info("Compacting SSTables")
-    sst_files = File.ls!(@ssts_path)
+
+    sst_files =
+      Kvstore.SSTList.list()
+      |> Enum.map(&Atom.to_string/1)
+
+    :timer.sleep(1000)
+
     do_the_compaction(sst_files)
 
     Kvstore.LSMTree.update_level_from_compaction(0)

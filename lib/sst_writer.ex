@@ -25,18 +25,20 @@ defmodule Kvstore.SSTWriterG do
     name = @path <> "/" <> file_name
 
     Logger.info("Writing SST file: #{name}, table: #{inspect(table)}")
-    {:ok, file_descriptor} = File.open(name, [:write, :append])
+    {:ok, file_descriptor} = :file.open(name, [:raw, :write, :append])
 
     :ets.foldl(
       fn {key, value}, _ ->
         # Logger.debug("foldl #{inspect(table)}, key: #{key}, value: #{value}")
-        IO.write(file_descriptor, "#{key},#{value}\n")
+        :file.write(file_descriptor, "#{key},#{value}\n")
       end,
       nil,
       table
     )
 
-    :ok = File.close(file_descriptor)
+    :ok = :file.sync(file_descriptor)
+
+    :ok = :file.close(file_descriptor)
 
     Kvstore.SSTList.add(file_name)
     Kvstore.Memetable.done_writing()

@@ -7,11 +7,11 @@ defmodule Kvstore.LSMLevel do
     catch
       ArgumentError ->
         # This error occurs if the pid is not a valid process.
-        Logger.info("Invalid LSMLevel pid: #{inspect(pid)}")
+        Logger.error("Invalid LSMLevel pid: #{inspect(pid)}")
 
       :exit, reason ->
         # Handle abrupt termination reasons.
-        Logger.info("LSMLevel terminated: #{inspect(reason)}")
+        Logger.error("LSMLevel terminated: #{inspect(reason)}")
         nil
     end
   end

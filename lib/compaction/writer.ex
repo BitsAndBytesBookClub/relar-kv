@@ -2,7 +2,7 @@ defmodule Compaction.Writer do
   def data(path, count \\ 100) do
     File.mkdir_p!(path)
 
-    {:ok, fd} = File.open(path <> "/a", [:write, :utf8])
+    {:ok, fd} = :file.open(path <> "/a", [:raw, :write, :utf8])
     {fd, 0, "a", path, count}
   end
 
@@ -13,19 +13,26 @@ defmodule Compaction.Writer do
   def write({fd, count, letter, path, max_count}, key, value) do
     case count > max_count do
       true ->
-        File.close(fd)
+        :ok = :file.sync(fd)
+
+        :file.close(fd)
         next_letter = NextLetter.get_next_letter(letter)
-        {:ok, fd} = File.open(path <> "/#{next_letter}", [:write, :utf8])
-        IO.write(fd, "#{key},#{value}")
+        {:ok, fd} = :file.open(path <> "/#{next_letter}", [:raw, :write, :utf8])
+        :file.write(fd, "#{key},#{value}")
         {fd, 1, next_letter, path, max_count}
 
       false ->
-        IO.write(fd, "#{key},#{value}")
+        :file.write(fd, "#{key},#{value}")
         {fd, count + 1, letter, path, max_count}
     end
   end
 
   def close({fd, _, _, _, _}) do
-    File.close(fd)
+    case :file.sync(fd) do
+      {:ok, _} -> :ok
+      {:error, _} -> :error
+    end
+
+    :file.close(fd)
   end
 end
