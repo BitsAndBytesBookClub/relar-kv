@@ -7,6 +7,26 @@ defmodule Kvstore.Application do
 
   @impl true
   def start(_type, _args) do
+    case Mix.env() do
+      :test ->
+        File.rm!("db/memetable")
+
+        File.ls!("db/compacted")
+        |> Enum.each(fn file -> File.rm_rf!("db/compacted/#{file}") end)
+
+        File.ls!("db/sst")
+        |> Enum.each(fn file -> File.rm!("db/sst/#{file}") end)
+
+        File.ls!("db/lsm")
+        |> Enum.each(fn dir ->
+          File.ls!("db/lsm/#{dir}")
+          |> Enum.each(fn file -> File.rm("db/lsm/#{dir}/#{file}") end)
+        end)
+
+      _ ->
+        :ok
+    end
+
     File.mkdir("db")
     File.mkdir("db/lsm")
     File.mkdir("db/lsm/0")

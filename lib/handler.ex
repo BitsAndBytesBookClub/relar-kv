@@ -58,20 +58,17 @@ defmodule KV do
 
     str_i = Integer.to_string(i)
 
-    res =
-      keys
-      |> Enum.map(fn key ->
-        case KV.get(key) do
-          nil -> "Key not"
-          ^str_i -> "good"
-          v -> "#{v}"
-        end
-      end)
-      |> Enum.reduce(%{}, fn v, acc ->
-        Map.update(acc, v, 1, &(&1 + 1))
-      end)
-
-    dbg(res)
+    keys
+    |> Enum.map(fn key ->
+      case KV.get(key) do
+        nil -> "Key not"
+        ^str_i -> "good"
+        v -> "#{v}"
+      end
+    end)
+    |> Enum.reduce(%{}, fn v, acc ->
+      Map.update(acc, v, 1, &(&1 + 1))
+    end)
   end
 
   def increment(keys) do

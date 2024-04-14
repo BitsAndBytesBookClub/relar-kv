@@ -1,5 +1,10 @@
 defmodule Compaction.LSMReader do
   def stream(path) do
+    path
+    |> Path.dirname()
+    |> :file.open([:write])
+    |> :file.sync()
+
     File.ls!(path)
     |> Enum.sort()
     |> Enum.map(&File.open(path <> "/" <> &1, [:read]))

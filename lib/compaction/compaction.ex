@@ -15,7 +15,7 @@ defmodule Kvstore.CompactionG do
 
   @lsm_path "db/lsm"
   @ssts_path "db/sst"
-  @max_ssts 3
+  @max_ssts 1
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: :compaction)
@@ -41,13 +41,16 @@ defmodule Kvstore.CompactionG do
     {:ok, %{ssts: ssts}}
   end
 
-  def handle_cast(:add_sst, %{ssts: ssts} = state) do
-    if ssts < @max_ssts do
-      {:noreply, %{state | ssts: ssts + 1}}
+  def handle_cast(:add_sst, state) do
+    ssts = Kvstore.SSTList.list()
+
+    if Enum.count(ssts) < @max_ssts do
+      {:noreply, state}
     else
-      Kvstore.Compaction.SSTToLevel0.compact()
+      dbg(ssts)
+      Kvstore.Compaction.SSTToLevel0.compact(ssts)
       GenServer.cast(:compaction, {:add_lsm_file, "0"})
-      {:noreply, %{state | ssts: 0}}
+      {:noreply, state}
     end
   end
 
@@ -186,14 +189,12 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   @level0_path "db/lsm/0"
   @new_level0_path "db/compacted/lsm/0"
 
-  def compact() do
+  def compact(sst_files) do
     Logger.info("Compacting SSTables")
 
     sst_files =
-      Kvstore.SSTList.list()
+      sst_files
       |> Enum.map(&Atom.to_string/1)
-
-    :timer.sleep(1000)
 
     do_the_compaction(sst_files)
 

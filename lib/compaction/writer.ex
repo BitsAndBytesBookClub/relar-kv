@@ -1,4 +1,6 @@
 defmodule Compaction.Writer do
+  require Logger
+
   def data(path, count \\ 100) do
     File.mkdir_p!(path)
 
@@ -13,7 +15,7 @@ defmodule Compaction.Writer do
   def write({fd, count, letter, path, max_count}, key, value) do
     case count > max_count do
       true ->
-        :ok = :file.sync(fd)
+        :ok = :file.datasync(fd)
 
         :file.close(fd)
         next_letter = NextLetter.get_next_letter(letter)
@@ -29,8 +31,12 @@ defmodule Compaction.Writer do
 
   def close({fd, _, _, _, _}) do
     case :file.sync(fd) do
-      {:ok, _} -> :ok
-      {:error, _} -> :error
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error("Error syncing file: #{inspect(reason)}")
+        :error
     end
 
     :file.close(fd)

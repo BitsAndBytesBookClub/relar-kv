@@ -98,7 +98,7 @@ defmodule Kvstore.MemetableG do
     Logger.info("Rolling memetable #{id}")
     new_table = create_new_table(id + 1)
     write_memetable_to_sst(table)
-    :ok = :file.sync(fd)
+    :ok = :file.datasync(fd)
     :ok = File.close(fd)
     :ok = File.rm(@memetable_path)
     {:ok, file_descriptor} = File.open(@memetable_path, [:write, :append])
