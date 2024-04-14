@@ -47,7 +47,6 @@ defmodule Kvstore.CompactionG do
     if Enum.count(ssts) < @max_ssts do
       {:noreply, state}
     else
-      dbg(ssts)
       Kvstore.Compaction.SSTToLevel0.compact(ssts)
       GenServer.cast(:compaction, {:add_lsm_file, "0"})
       {:noreply, state}
