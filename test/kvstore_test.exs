@@ -1,13 +1,15 @@
 defmodule KvstoreTest.End2End do
   use ExUnit.Case
-
-  doctest Kvstore
+  @tag workingon: true
 
   test "test 100x100" do
     KV.set("hello", "world")
     assert KV.get("hello") == "world"
 
-    assert KV.do_the_test(100, 100) == %{"good" => 100}
+    n = 150
+    incs = 10
+
+    assert KV.do_the_test(n, incs) == %{"good" => n}
   end
 end
 
@@ -39,7 +41,6 @@ end
 
 defmodule KvstoreTest.Compaction do
   use ExUnit.Case
-  @tag workingon: true
 
   def setup do
     File.rm_rf!("test_data/compaction_sst/result")

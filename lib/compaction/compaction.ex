@@ -15,7 +15,7 @@ defmodule Kvstore.CompactionG do
 
   @lsm_path "db/lsm"
   @ssts_path "db/sst"
-  @max_ssts 1
+  @max_ssts 3
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: :compaction)
