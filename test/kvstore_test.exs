@@ -1,5 +1,6 @@
-defmodule KvstoreTest do
+defmodule KvstoreTest.End2End do
   use ExUnit.Case
+
   doctest Kvstore
 
   test "test 100x100" do
@@ -8,9 +9,13 @@ defmodule KvstoreTest do
 
     assert KV.do_the_test(100, 100) == %{"good" => 100}
   end
+end
+
+defmodule KvstoreTest.SST do
+  use ExUnit.Case
 
   test "sst reading" do
-    wd = Compaction.SSTReader.data(~w[1 2 3], "test_data/sst")
+    wd = Compaction.SSTReader.data(~w[1 2 3], "test_data/sst_reading")
 
     kv_pairs = drain(wd)
 
@@ -29,5 +34,35 @@ defmodule KvstoreTest do
       {_, nil, nil} -> []
       {wd, k, v} -> [{k, v} | drain(wd)]
     end
+  end
+end
+
+defmodule KvstoreTest.Compaction do
+  use ExUnit.Case
+  @tag workingon: true
+
+  def setup do
+    File.rm_rf!("test_data/compaction_sst/result")
+  end
+
+  test "compaction sst to l0" do
+    sst_files = File.ls!("test_data/compaction_sst/sst")
+    sst_data = Compaction.SSTReader.data(sst_files, "test_data/compaction_sst/sst")
+    lsm_data = Compaction.LSMReader.stream("test_data/compaction_sst/lsm/0")
+    write_data = Compaction.Writer.data("test_data/compaction_sst/result")
+
+    Kvstore.Compaction.SSTToLevel0.combine_sst_and_lsm_keys(sst_data, lsm_data, write_data)
+
+    Compaction.Writer.close(write_data)
+
+    {:ok, results} = File.ls("test_data/compaction_sst/result")
+    {:ok, wants} = File.ls("test_data/compaction_sst/want")
+
+    assert Enum.count(results) == Enum.count(wants)
+
+    Enum.each(wants, fn file ->
+      assert File.read!("test_data/compaction_sst/result/#{file}") ==
+               File.read!("test_data/compaction_sst/want/#{file}")
+    end)
   end
 end

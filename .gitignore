@@ -26,3 +26,5 @@ kvstore-*.tar
 /tmp/
 
 /db
+
+result/

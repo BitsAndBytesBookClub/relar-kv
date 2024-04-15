@@ -221,7 +221,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
     Compaction.Writer.close(write_data)
   end
 
-  defp combine_sst_and_lsm_keys(sst_data, lsm_data, write_data) do
+  def combine_sst_and_lsm_keys(sst_data, lsm_data, write_data) do
     combine(write_data, sst_data, lsm_data, :both, nil, nil)
   end
 
