@@ -37,7 +37,7 @@ defmodule Kvstore.SSTFileG do
   def handle_call({:get, key}, _from, %{fd: fd, file: file} = state) do
     Logger.debug("Reading SST key: #{key} in #{file}")
 
-    :file.position(fd, {:bof, 0})
+    {:ok, _} = :file.position(fd, {:bof, 0})
 
     line =
       IO.stream(fd, :line)
@@ -57,8 +57,7 @@ defmodule Kvstore.SSTFileG do
 
   def terminate(_reason, %{fd: fd}) do
     # Logger.info("Closing SST file #{inspect(reason)}")
-    :ok = File.close(fd)
-    :ok
+    File.close(fd)
   end
 end
 

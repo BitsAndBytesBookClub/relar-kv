@@ -20,8 +20,8 @@ defmodule Kvstore.SSTWriterG do
   end
 
   def handle_call({:write, table}, _from, state) do
-    {megaseconds, seconds, milli} = :os.timestamp()
-    file_name = "#{megaseconds * 1_000_000_000 + seconds * 1_000 + milli}"
+    {megaseconds, seconds, micros} = :os.timestamp()
+    file_name = "#{megaseconds * 1_000_000_000_000 + seconds * 1_000_000 + micros}"
     name = @path <> "/" <> file_name
 
     Logger.info("Writing SST file: #{name}, table: #{inspect(table)}")

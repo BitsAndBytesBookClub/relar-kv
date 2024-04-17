@@ -1,6 +1,6 @@
 defmodule Kvstore.SSTList do
   def list() do
-    GenServer.call(Kvstore.SSTListG, {:list, nil})
+    GenServer.call(Kvstore.SSTListG, {:list})
   end
 
   def add(name) do
@@ -47,7 +47,7 @@ defmodule Kvstore.SSTListG do
     {:ok, %{files: Enum.zip([files, pids])}}
   end
 
-  def handle_call({:list, _}, _from, %{files: files} = state) do
+  def handle_call({:list}, _from, %{files: files} = state) do
     Logger.debug("Listing SST files: #{inspect(files)}")
 
     atom_files =
