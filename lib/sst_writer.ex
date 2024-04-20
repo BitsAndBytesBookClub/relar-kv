@@ -9,20 +9,18 @@ defmodule Kvstore.SSTWriterG do
 
   require Logger
 
-  @path "db/sst"
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  def start_link(path) do
+    GenServer.start_link(__MODULE__, path, name: __MODULE__)
   end
 
-  def init(_) do
-    {:ok, %{}}
+  def init(path) do
+    {:ok, %{path: path}}
   end
 
-  def handle_call({:write, table}, _from, state) do
+  def handle_call({:write, table}, _from, %{path: path} = state) do
     {megaseconds, seconds, micros} = :os.timestamp()
     file_name = "#{megaseconds * 1_000_000_000_000 + seconds * 1_000_000 + micros}"
-    name = @path <> "/" <> file_name
+    name = path <> "/" <> file_name
 
     Logger.info("Writing SST file: #{name}, table: #{inspect(table)}")
     {:ok, file_descriptor} = :file.open(name, [:raw, :write, :append])

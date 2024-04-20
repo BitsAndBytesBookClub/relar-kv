@@ -17,15 +17,13 @@ defmodule Kvstore.SSTListG do
 
   require Logger
 
-  @path "db/sst"
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  def start_link(path) do
+    GenServer.start_link(__MODULE__, path, name: __MODULE__)
   end
 
-  def init(_) do
+  def init(path) do
     files =
-      File.ls!(@path)
+      File.ls!(path)
       |> Enum.map(&String.to_integer/1)
       |> Enum.sort()
       |> Enum.reverse()
@@ -38,13 +36,13 @@ defmodule Kvstore.SSTListG do
         {:ok, pid} =
           DynamicSupervisor.start_child(
             Kvstore.SSTFileSupervisor,
-            {Kvstore.SSTFileG, %{file: file}}
+            {Kvstore.SSTFileG, %{file: file, path: path}}
           )
 
         pid
       end)
 
-    {:ok, %{files: Enum.zip([files, pids])}}
+    {:ok, %{files: Enum.zip([files, pids]), path: path}}
   end
 
   def handle_call({:list}, _from, %{files: files} = state) do
@@ -58,7 +56,7 @@ defmodule Kvstore.SSTListG do
     {:reply, atom_files, state}
   end
 
-  def handle_call({:remove, files}, _from, %{files: all_files} = state) do
+  def handle_call({:remove, files}, _from, %{files: all_files, path: path} = state) do
     Logger.info("Removing SST files: #{inspect(files)}")
 
     Enum.each(files, fn file ->
@@ -68,7 +66,7 @@ defmodule Kvstore.SSTListG do
 
         {_, pid} ->
           :ok = DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor, pid)
-          File.rm!(@path <> "/" <> file)
+          File.rm!(path <> "/" <> file)
       end
     end)
 
@@ -76,15 +74,15 @@ defmodule Kvstore.SSTListG do
      %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}
   end
 
-  def handle_call({:add_level, name}, _from, %{files: files}) do
+  def handle_call({:add_level, name}, _from, state) do
     Logger.info("Adding SST file: #{name}")
 
     {:ok, pid} =
       DynamicSupervisor.start_child(
         Kvstore.SSTFileSupervisor,
-        {Kvstore.SSTFileG, %{file: name}}
+        {Kvstore.SSTFileG, %{file: name, path: state.path}}
       )
 
-    {:reply, :ok, %{files: [{name, pid} | files]}}
+    {:reply, :ok, %{state | files: [{name, pid} | state.files]}}
   end
 end

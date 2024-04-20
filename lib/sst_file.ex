@@ -22,15 +22,13 @@ defmodule Kvstore.SSTFileG do
 
   require Logger
 
-  @path "db/sst"
-
   def start_link(%{file: file} = args) do
     GenServer.start_link(__MODULE__, args, name: String.to_atom(file))
   end
 
-  def init(%{file: file}) do
+  def init(%{file: file, path: path}) do
     Process.flag(:trap_exit, true)
-    {:ok, fd} = File.open(@path <> "/" <> file, [:read])
+    {:ok, fd} = File.open(path <> "/" <> file, [:read])
     {:ok, %{fd: fd, file: file}}
   end
 

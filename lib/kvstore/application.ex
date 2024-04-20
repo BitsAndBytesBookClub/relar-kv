@@ -9,7 +9,7 @@ defmodule Kvstore.Application do
   def start(_type, _args) do
     case Mix.env() do
       :test ->
-        File.rm!("db/memetable")
+        File.rm_rf!("db/memetable")
 
         File.ls!("db/compacted")
         |> Enum.each(fn file -> File.rm_rf!("db/compacted/#{file}") end)
@@ -40,10 +40,10 @@ defmodule Kvstore.Application do
       {Kvstore.LSMLevelSupervisor, []},
       {Kvstore.LSMTreeG, []},
       {Kvstore.SSTFileSupervisor, []},
-      {Kvstore.SSTListG, []},
+      {Kvstore.SSTListG, "db/sst"},
       {Kvstore.MemetableG, []},
       {Kvstore.CompactionG, []},
-      {Kvstore.SSTWriterG, []},
+      {Kvstore.SSTWriterG, "db/sst"},
       Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),
       Supervisor.child_spec({Kvstore.Handler, %{name: :h2}}, id: :h2)
     ]
