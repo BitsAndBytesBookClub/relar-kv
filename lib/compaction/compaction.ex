@@ -38,7 +38,15 @@ defmodule Kvstore.CompactionG do
       end
     end)
 
-    {:ok, %{ssts: ssts, l0_compactor: Kvstore.Compaction.SSTToLevel0.init("db/trash")}}
+    level0_compactor =
+      Kvstore.Compaction.SSTToLevel0.init(
+        "db/trash",
+        "db/sst",
+        "db/lsm/0",
+        "db/compacted/lsm/0"
+      )
+
+    {:ok, %{ssts: ssts, l0_compactor: level0_compactor}}
   end
 
   def handle_cast(:add_sst, state) do
@@ -185,43 +193,44 @@ end
 defmodule Kvstore.Compaction.SSTToLevel0 do
   require Logger
 
-  @ssts_path "db/sst"
-  @level0_path "db/lsm/0"
-  @new_level0_path "db/compacted/lsm/0"
+  defstruct trash_path: nil, sst_path: nil, level0_path: nil, new_level0_path: nil
 
-  defstruct trash_path: nil
-
-  def init(trash_path) do
-    %__MODULE__{trash_path: trash_path}
+  def init(trash_path, sst_path, level0_path, new_level0_path) do
+    %__MODULE__{
+      trash_path: trash_path,
+      sst_path: sst_path,
+      level0_path: level0_path,
+      new_level0_path: new_level0_path
+    }
   end
 
-  def compact(%__MODULE__{trash_path: trash_path}, sst_files) do
+  def compact(cfg, sst_files) do
     Logger.info("Compacting SSTables")
 
     sst_files =
       sst_files
       |> Enum.map(&Atom.to_string/1)
 
-    do_the_compaction(sst_files)
+    do_the_compaction(cfg, sst_files)
 
     Kvstore.LSMTree.update_level_from_compaction(0)
 
-    Kvstore.TrashBin.empty(trash_path)
+    Kvstore.TrashBin.empty(cfg.trash_path)
 
-    File.rename!(@level0_path, trash_path <> "/" <> "0")
-    File.rename!(@new_level0_path, @level0_path)
+    File.rename!(cfg.level0_path, cfg.trash_path <> "/" <> "0")
+    File.rename!(cfg.new_level0_path, cfg.level0_path)
 
-    Kvstore.TrashBin.empty(trash_path)
+    Kvstore.TrashBin.empty(cfg.trash_path)
 
     Kvstore.SSTList.remove(sst_files)
 
     Logger.info("Finished compacting SSTables")
   end
 
-  def do_the_compaction(sst_files) do
-    sst_data = Compaction.SSTReader.data(sst_files, @ssts_path)
-    lsm_data = Compaction.LSMReader.stream(@level0_path)
-    write_data = Compaction.Writer.data(@new_level0_path)
+  def do_the_compaction(cfg, sst_files) do
+    sst_data = Compaction.SSTReader.data(sst_files, cfg.sst_path)
+    lsm_data = Compaction.LSMReader.stream(cfg.level0_path)
+    write_data = Compaction.Writer.data(cfg.new_level0_path)
 
     combine_sst_and_lsm_keys(sst_data, lsm_data, write_data)
 
