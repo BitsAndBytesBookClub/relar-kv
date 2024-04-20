@@ -29,12 +29,8 @@ defmodule Kvstore.MemetableG do
 
   require Logger
 
-  @table_prefix :memetable
-  @memetable_path "db/memetable"
-  @max_size 100
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   def add_integer_to_atom(atom, integer) do
@@ -44,28 +40,28 @@ defmodule Kvstore.MemetableG do
     String.to_atom(new_atom_string)
   end
 
-  def init(_) do
+  def init(args) do
     id = 0
 
-    table = create_new_table(id)
+    table = create_new_table(args.table_prefix, id)
 
     count =
-      case File.read(@memetable_path) do
-        {:ok, _} -> load_memetable(table)
+      case File.read(args.memetable_path) do
+        {:ok, _} -> load_memetable(args.memtable_path, table)
         {:error, _} -> 0
       end
 
-    {:ok, file_descriptor} = File.open(@memetable_path, [:write, :append])
+    {:ok, file_descriptor} = File.open(args.memetable_path, [:write, :append])
 
     {:ok,
-     %{
-       f: file_descriptor,
+     Map.merge(args, %{
+       fd: file_descriptor,
        count: count,
        table: table,
        id: id,
        old_table: nil,
        called_roll: false
-     }}
+     })}
   end
 
   def handle_call({:memtables}, _from, %{table: table, old_table: ot} = state) do
@@ -78,40 +74,39 @@ defmodule Kvstore.MemetableG do
   def handle_call(
         {:set, key, value},
         _from,
-        %{f: fd, count: count, table: table, old_table: old_table, called_roll: called_roll} =
-          state
+        s
       ) do
-    :ok = IO.write(fd, "#{key},#{value}\n")
-    true = :ets.insert(table, {key, value})
+    :ok = IO.write(s.fd, "#{key},#{value}\n")
+    true = :ets.insert(s.table, {key, value})
 
-    case [count, old_table, called_roll] do
-      [n, nil, false] when n > @max_size ->
+    case [s.count, s.old_table, s.called_roll] do
+      [n, nil, false] when n > s.max_size ->
         GenServer.cast(__MODULE__, {:roll})
-        {:reply, :ok, %{state | count: count + 1, called_roll: true}}
+        {:reply, :ok, %{s | count: s.count + 1, called_roll: true}}
 
       _ ->
-        {:reply, :ok, %{state | count: count + 1}}
+        {:reply, :ok, %{s | count: s.count + 1}}
     end
   end
 
-  def handle_cast({:roll}, %{f: fd, table: table, id: id}) do
+  def handle_cast({:roll}, %{fd: fd, table: table, id: id} = s) do
     Logger.info("Rolling memetable #{id}")
-    new_table = create_new_table(id + 1)
+    new_table = create_new_table(s.table_prefix, id + 1)
     write_memetable_to_sst(table)
     :ok = :file.datasync(fd)
     :ok = File.close(fd)
-    :ok = File.rm(@memetable_path)
-    {:ok, file_descriptor} = File.open(@memetable_path, [:write, :append])
+    :ok = File.rm(s.memetable_path)
+    {:ok, file_descriptor} = File.open(s.memetable_path, [:write, :append])
 
     {:noreply,
-     %{
-       f: file_descriptor,
+     Map.merge(s, %{
+       fd: file_descriptor,
        count: 0,
        table: new_table,
        old_table: table,
        id: id + 1,
        called_roll: false
-     }}
+     })}
   end
 
   def handle_cast({:done_writing}, %{old_table: ot} = state) do
@@ -120,8 +115,8 @@ defmodule Kvstore.MemetableG do
     {:noreply, %{state | old_table: nil}}
   end
 
-  defp load_memetable(table) do
-    File.stream!(@memetable_path)
+  defp load_memetable(memetable_path, table) do
+    File.stream!(memetable_path)
     |> Stream.map(&String.trim(&1, "\n"))
     |> Stream.map(&String.split(&1, ","))
     |> Enum.each(fn [key, value] -> :ets.insert(table, {key, value}) end)
@@ -129,8 +124,8 @@ defmodule Kvstore.MemetableG do
     :ets.info(table, :size)
   end
 
-  defp create_new_table(id) do
-    :ets.new(add_integer_to_atom(@table_prefix, id), [:ordered_set, :public, :named_table])
+  defp create_new_table(table_prefix, id) do
+    :ets.new(add_integer_to_atom(table_prefix, id), [:ordered_set, :public, :named_table])
   end
 
   defp write_memetable_to_sst(table) do
