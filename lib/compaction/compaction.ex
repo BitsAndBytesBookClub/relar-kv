@@ -75,7 +75,9 @@ defmodule Kvstore.CompactionG do
         |> Integer.to_string()
 
       # TODO
-      Kvstore.Compaction.LSM.compact(level, "db/trash")
+
+      lsm_compactor = Kvstore.Compaction.LSM.init(@lsm_path, "db/trash")
+      Kvstore.Compaction.LSM.compact(lsm_compactor, level)
       GenServer.cast(:compaction, {:add_lsm_file, next_level})
     end
 
@@ -86,12 +88,19 @@ end
 defmodule Kvstore.Compaction.LSM do
   require Logger
 
-  @path "db/lsm/"
+  defstruct path: nil, trash_path: nil
 
-  def compact(level, trash_path) do
+  def init(path, trash_path) do
+    %__MODULE__{
+      path: path,
+      trash_path: trash_path
+    }
+  end
+
+  def compact(cfg, level) do
     Logger.info("Compacting LSM Level #{level}")
 
-    do_the_compaction(level)
+    do_the_compaction(cfg, level)
 
     next_level =
       level
@@ -101,24 +110,24 @@ defmodule Kvstore.Compaction.LSM do
 
     Kvstore.LSMTree.update_level_from_compaction(next_level)
 
-    Kvstore.TrashBin.empty(trash_path)
+    Kvstore.TrashBin.empty(cfg.trash_path)
 
-    File.rename!(@path <> next_level, trash_path <> "/" <> next_level)
-    File.rename!("db/compacted/lsm/" <> next_level, @path <> next_level)
+    File.rename!(cfg.lsm_path <> next_level, cfg.trash_path <> "/" <> next_level)
+    File.rename!("db/compacted/lsm/" <> next_level, cfg.lsm_path <> next_level)
 
-    File.rename!(@path <> level, trash_path <> "/" <> level)
+    File.rename!(cfg.lsm_path <> level, cfg.trash_path <> "/" <> level)
 
-    File.mkdir_p!(@path <> level)
+    File.mkdir_p!(cfg.lsm_path <> level)
 
-    Kvstore.TrashBin.empty(trash_path)
+    Kvstore.TrashBin.empty(cfg.trash_path)
 
     Kvstore.LSMTree.update_level_from_lsm(level)
 
     Logger.info("Finished compacting LSM Level #{level}")
   end
 
-  defp do_the_compaction(level) do
-    lsm_a = Compaction.LSMReader.stream(@path <> level)
+  defp do_the_compaction(cfg, level) do
+    lsm_a = Compaction.LSMReader.stream(cfg.lsm_path <> level)
 
     next_level =
       level
@@ -126,9 +135,9 @@ defmodule Kvstore.Compaction.LSM do
       |> Kernel.+(1)
       |> Integer.to_string()
 
-    File.mkdir_p!(@path <> next_level)
+    File.mkdir_p!(cfg.lsm_path <> next_level)
 
-    lsm_b = Compaction.LSMReader.stream(@path <> next_level)
+    lsm_b = Compaction.LSMReader.stream(cfg.lsm_path <> next_level)
 
     next_level_i =
       level
