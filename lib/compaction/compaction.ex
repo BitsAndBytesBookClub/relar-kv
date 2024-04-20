@@ -38,7 +38,7 @@ defmodule Kvstore.CompactionG do
       end
     end)
 
-    {:ok, %{ssts: ssts}}
+    {:ok, %{ssts: ssts, l0_compactor: Kvstore.Compaction.SSTToLevel0.init("db/trash")}}
   end
 
   def handle_cast(:add_sst, state) do
@@ -47,7 +47,7 @@ defmodule Kvstore.CompactionG do
     if Enum.count(ssts) < @max_ssts do
       {:noreply, state}
     else
-      Kvstore.Compaction.SSTToLevel0.compact(ssts)
+      Kvstore.Compaction.SSTToLevel0.compact(state.l0_compactor, ssts)
       GenServer.cast(:compaction, {:add_lsm_file, "0"})
       {:noreply, state}
     end
@@ -66,7 +66,8 @@ defmodule Kvstore.CompactionG do
         |> Kernel.+(1)
         |> Integer.to_string()
 
-      Kvstore.Compaction.LSM.compact(level)
+      # TODO
+      Kvstore.Compaction.LSM.compact(level, "db/trash")
       GenServer.cast(:compaction, {:add_lsm_file, next_level})
     end
 
@@ -79,7 +80,7 @@ defmodule Kvstore.Compaction.LSM do
 
   @path "db/lsm/"
 
-  def compact(level) do
+  def compact(level, trash_path) do
     Logger.info("Compacting LSM Level #{level}")
 
     do_the_compaction(level)
@@ -92,16 +93,16 @@ defmodule Kvstore.Compaction.LSM do
 
     Kvstore.LSMTree.update_level_from_compaction(next_level)
 
-    Kvstore.TrashBin.empty()
+    Kvstore.TrashBin.empty(trash_path)
 
-    File.rename!(@path <> next_level, Kvstore.TrashBin.path() <> "/" <> next_level)
+    File.rename!(@path <> next_level, trash_path <> "/" <> next_level)
     File.rename!("db/compacted/lsm/" <> next_level, @path <> next_level)
 
-    File.rename!(@path <> level, Kvstore.TrashBin.path() <> "/" <> level)
+    File.rename!(@path <> level, trash_path <> "/" <> level)
 
     File.mkdir_p!(@path <> level)
 
-    Kvstore.TrashBin.empty()
+    Kvstore.TrashBin.empty(trash_path)
 
     Kvstore.LSMTree.update_level_from_lsm(level)
 
@@ -188,7 +189,13 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   @level0_path "db/lsm/0"
   @new_level0_path "db/compacted/lsm/0"
 
-  def compact(sst_files) do
+  defstruct trash_path: nil
+
+  def init(trash_path) do
+    %__MODULE__{trash_path: trash_path}
+  end
+
+  def compact(%__MODULE__{trash_path: trash_path}, sst_files) do
     Logger.info("Compacting SSTables")
 
     sst_files =
@@ -199,12 +206,12 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
     Kvstore.LSMTree.update_level_from_compaction(0)
 
-    Kvstore.TrashBin.empty()
+    Kvstore.TrashBin.empty(trash_path)
 
-    File.rename!(@level0_path, Kvstore.TrashBin.path() <> "/" <> "0")
+    File.rename!(@level0_path, trash_path <> "/" <> "0")
     File.rename!(@new_level0_path, @level0_path)
 
-    Kvstore.TrashBin.empty()
+    Kvstore.TrashBin.empty(trash_path)
 
     Kvstore.SSTList.remove(sst_files)
 
