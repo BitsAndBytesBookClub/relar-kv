@@ -50,7 +50,8 @@ defmodule Kvstore.Application do
          sst_path: "db/sst",
          trash_path: "db/trash",
          level0_path: "db/lsm/0",
-         new_level0_path: "db/compacted/lsm/0"
+         new_level0_path: "db/compacted/lsm/0",
+         compacted_lsm_dir: "db/compacted/lsm"
        }},
       {Kvstore.SSTWriterG, "db/sst"},
       Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),

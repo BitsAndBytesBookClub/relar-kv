@@ -74,9 +74,9 @@ defmodule Kvstore.CompactionG do
         |> Kernel.+(1)
         |> Integer.to_string()
 
-      # TODO
+      lsm_compactor =
+        Kvstore.Compaction.LSM.init(state.lsm_path, state.trash_path, state.compacted_lsm_dir)
 
-      lsm_compactor = Kvstore.Compaction.LSM.init(state.lsm_path, "db/trash")
       Kvstore.Compaction.LSM.compact(lsm_compactor, level)
       GenServer.cast(:compaction, {:add_lsm_file, next_level})
     end
@@ -88,12 +88,13 @@ end
 defmodule Kvstore.Compaction.LSM do
   require Logger
 
-  defstruct path: nil, trash_path: nil
+  defstruct path: nil, trash_path: nil, new_level_path: nil
 
-  def init(path, trash_path) do
+  def init(path, trash_path, new_level_path) do
     %__MODULE__{
       path: path <> "/",
-      trash_path: trash_path
+      trash_path: trash_path,
+      new_level_path: new_level_path
     }
   end
 
@@ -113,7 +114,7 @@ defmodule Kvstore.Compaction.LSM do
     Kvstore.TrashBin.empty(cfg.trash_path)
 
     File.rename!(cfg.path <> next_level, cfg.trash_path <> "/" <> next_level)
-    File.rename!("db/compacted/lsm/" <> next_level, cfg.path <> next_level)
+    File.rename!(cfg.new_level_path <> "/" <> next_level, cfg.path <> next_level)
 
     File.rename!(cfg.path <> level, cfg.trash_path <> "/" <> level)
 
@@ -147,7 +148,7 @@ defmodule Kvstore.Compaction.LSM do
 
     wd =
       Compaction.Writer.data(
-        "db/compacted/lsm/#{next_level}",
+        cfg.new_level_path <> "/#{next_level}",
         max_count
       )
 
