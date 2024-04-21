@@ -13,24 +13,20 @@ defmodule Kvstore.CompactionG do
 
   require Logger
 
-  @lsm_path "db/lsm"
-  @ssts_path "db/sst"
-  @max_ssts 3
-
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: :compaction)
   end
 
-  def init(_args) do
-    ssts = Enum.count(File.ls!(@ssts_path))
+  def init(args) do
+    ssts = Enum.count(File.ls!(args.sst_path))
 
-    if ssts > @max_ssts do
+    if ssts > args.max_ssts do
       GenServer.cast(:compaction, :add_sst)
     end
 
     lsms =
-      File.ls!(@lsm_path)
-      |> Enum.map(fn dir -> {dir, Enum.count(File.ls!(@lsm_path <> "/" <> dir))} end)
+      File.ls!(args.lsm_path)
+      |> Enum.map(fn dir -> {dir, Enum.count(File.ls!(args.lsm_path <> "/" <> dir))} end)
 
     Enum.each(lsms, fn {level, count} ->
       if count > 10 do
@@ -40,19 +36,23 @@ defmodule Kvstore.CompactionG do
 
     level0_compactor =
       Kvstore.Compaction.SSTToLevel0.init(
-        "db/trash",
-        "db/sst",
-        "db/lsm/0",
-        "db/compacted/lsm/0"
+        args.trash_path,
+        args.sst_path,
+        args.level0_path,
+        args.new_level0_path
       )
 
-    {:ok, %{ssts: ssts, l0_compactor: level0_compactor}}
+    {:ok,
+     Map.merge(
+       args,
+       %{ssts: ssts, l0_compactor: level0_compactor}
+     )}
   end
 
   def handle_cast(:add_sst, state) do
     ssts = Kvstore.SSTList.list()
 
-    if Enum.count(ssts) < @max_ssts do
+    if Enum.count(ssts) < state.max_ssts do
       {:noreply, state}
     else
       Kvstore.Compaction.SSTToLevel0.compact(state.l0_compactor, ssts)
@@ -63,7 +63,7 @@ defmodule Kvstore.CompactionG do
 
   def handle_cast({:add_lsm_file, level}, state) do
     count =
-      (@lsm_path <> "/" <> level)
+      (state.lsm_path <> "/" <> level)
       |> File.ls!()
       |> Enum.count()
 
@@ -76,7 +76,7 @@ defmodule Kvstore.CompactionG do
 
       # TODO
 
-      lsm_compactor = Kvstore.Compaction.LSM.init(@lsm_path, "db/trash")
+      lsm_compactor = Kvstore.Compaction.LSM.init(state.lsm_path, "db/trash")
       Kvstore.Compaction.LSM.compact(lsm_compactor, level)
       GenServer.cast(:compaction, {:add_lsm_file, next_level})
     end

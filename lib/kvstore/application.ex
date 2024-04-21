@@ -43,7 +43,15 @@ defmodule Kvstore.Application do
       {Kvstore.SSTListG, "db/sst"},
       {Kvstore.MemetableG,
        %{table_prefix: :memetable, memetable_path: "db/memetable", max_size: 100}},
-      {Kvstore.CompactionG, []},
+      {Kvstore.CompactionG,
+       %{
+         max_ssts: 3,
+         lsm_path: "db/lsm",
+         sst_path: "db/sst",
+         trash_path: "db/trash",
+         level0_path: "db/lsm/0",
+         new_level0_path: "db/compacted/lsm/0"
+       }},
       {Kvstore.SSTWriterG, "db/sst"},
       Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),
       Supervisor.child_spec({Kvstore.Handler, %{name: :h2}}, id: :h2)
