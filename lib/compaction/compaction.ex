@@ -92,7 +92,7 @@ defmodule Kvstore.Compaction.LSM do
 
   def init(path, trash_path) do
     %__MODULE__{
-      path: path,
+      path: path <> "/",
       trash_path: trash_path
     }
   end
@@ -112,12 +112,12 @@ defmodule Kvstore.Compaction.LSM do
 
     Kvstore.TrashBin.empty(cfg.trash_path)
 
-    File.rename!(cfg.lsm_path <> next_level, cfg.trash_path <> "/" <> next_level)
-    File.rename!("db/compacted/lsm/" <> next_level, cfg.lsm_path <> next_level)
+    File.rename!(cfg.path <> next_level, cfg.trash_path <> "/" <> next_level)
+    File.rename!("db/compacted/lsm/" <> next_level, cfg.path <> next_level)
 
-    File.rename!(cfg.lsm_path <> level, cfg.trash_path <> "/" <> level)
+    File.rename!(cfg.path <> level, cfg.trash_path <> "/" <> level)
 
-    File.mkdir_p!(cfg.lsm_path <> level)
+    File.mkdir_p!(cfg.path <> level)
 
     Kvstore.TrashBin.empty(cfg.trash_path)
 
@@ -127,7 +127,7 @@ defmodule Kvstore.Compaction.LSM do
   end
 
   defp do_the_compaction(cfg, level) do
-    lsm_a = Compaction.LSMReader.stream(cfg.lsm_path <> level)
+    lsm_a = Compaction.LSMReader.stream(cfg.path <> level)
 
     next_level =
       level
@@ -135,9 +135,9 @@ defmodule Kvstore.Compaction.LSM do
       |> Kernel.+(1)
       |> Integer.to_string()
 
-    File.mkdir_p!(cfg.lsm_path <> next_level)
+    File.mkdir_p!(cfg.path <> next_level)
 
-    lsm_b = Compaction.LSMReader.stream(cfg.lsm_path <> next_level)
+    lsm_b = Compaction.LSMReader.stream(cfg.path <> next_level)
 
     next_level_i =
       level
