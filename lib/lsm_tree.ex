@@ -28,17 +28,15 @@ defmodule Kvstore.LSMTreeG do
 
   require Logger
 
-  @path "db/lsm"
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  def start_link(path) do
+    GenServer.start_link(__MODULE__, path, name: __MODULE__)
   end
 
-  def init(_) do
+  def init(path) do
     Process.flag(:trap_exit, true)
 
     levels =
-      File.ls!(@path)
+      File.ls!(path)
       |> Enum.map(&String.to_integer/1)
       |> Enum.sort()
       |> Enum.map(&Integer.to_string/1)
@@ -50,7 +48,7 @@ defmodule Kvstore.LSMTreeG do
         {:ok, pid} =
           DynamicSupervisor.start_child(
             Kvstore.LSMLevelSupervisor,
-            {Kvstore.LSMLevelG, %{level: level, iteration: 0, path: @path}}
+            {Kvstore.LSMLevelG, %{level: level, iteration: 0, path: path}}
           )
 
         pid

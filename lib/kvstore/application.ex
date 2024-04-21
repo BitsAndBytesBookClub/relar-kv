@@ -38,7 +38,7 @@ defmodule Kvstore.Application do
     children = [
       {Kvstore.LSMPartSupervisor, []},
       {Kvstore.LSMLevelSupervisor, []},
-      {Kvstore.LSMTreeG, []},
+      {Kvstore.LSMTreeG, "db/lsm"},
       {Kvstore.SSTFileSupervisor, []},
       {Kvstore.SSTListG, "db/sst"},
       {Kvstore.MemetableG,
