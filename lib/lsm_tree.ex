@@ -106,8 +106,8 @@ defmodule Kvstore.LSMTreeG do
             Kvstore.LSMLevelG.child_spec(args)
           )
 
-        # do it a bit later
-        GenServer.cast(Kvstore.LSMLevelG, {:terminate_child, pid})
+        :ok =
+          DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
 
         {:reply, :ok,
          %{
@@ -122,12 +122,6 @@ defmodule Kvstore.LSMTreeG do
                end)
          }}
     end
-  end
-
-  def handle_cast({:teminate_child, pid}, state) do
-    :ok = DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
-
-    {:noreply, state}
   end
 
   def terminate(_reason, %{levels: levels}) do
