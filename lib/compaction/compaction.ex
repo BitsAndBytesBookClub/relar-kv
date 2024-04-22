@@ -14,7 +14,8 @@ defmodule Kvstore.CompactionG do
   require Logger
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: :compaction)
+    __MODULE__
+    |> GenServer.start_link(args, name: String.to_atom("compaction_#{args.node_id}"))
   end
 
   def init(args) do
@@ -50,7 +51,7 @@ defmodule Kvstore.CompactionG do
   end
 
   def handle_cast(:add_sst, state) do
-    ssts = Kvstore.SSTList.list()
+    ssts = Kvstore.SSTList.list(state.node_id)
 
     if Enum.count(ssts) < state.max_ssts do
       {:noreply, state}
@@ -214,7 +215,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
     }
   end
 
-  def compact(cfg, sst_files) do
+  def compact(node_id, cfg, sst_files) do
     Logger.info("Compacting SSTables")
 
     sst_files =
@@ -232,7 +233,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
     Kvstore.TrashBin.empty(cfg.trash_path)
 
-    Kvstore.SSTList.remove(sst_files)
+    Kvstore.SSTList.remove(node_id, sst_files)
 
     Logger.info("Finished compacting SSTables")
   end

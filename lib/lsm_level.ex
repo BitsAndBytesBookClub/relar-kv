@@ -34,12 +34,12 @@ defmodule Kvstore.LSMLevelG do
     }
   end
 
+  def name(node, level, i) do
+    String.to_atom("level_#{node}_#{level}_#{i}")
+  end
+
   def start_link(%{level: level, iteration: i, path: _path} = args) do
-    name = "level" <> level <> "_" <> Integer.to_string(i)
-
-    Logger.info("LSMLevel | Starting: #{name}")
-
-    GenServer.start_link(__MODULE__, args, name: String.to_atom(name))
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id, level, i))
   end
 
   def init(%{level: level, iteration: i, path: path}) do
@@ -147,8 +147,12 @@ end
 defmodule Kvstore.LSMLevelSupervisor do
   use DynamicSupervisor
 
-  def start_link(init_arg) do
-    DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
+  def name(id) do
+    String.to_atom("lsm_level_supervisor_#{id}")
+  end
+
+  def start_link(args) do
+    DynamicSupervisor.start_link(__MODULE__, args, name: name(args.node_id))
   end
 
   def init(_init_arg) do

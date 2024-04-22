@@ -15,7 +15,7 @@ defmodule Kvstore.MixProject do
   def application do
     [
       extra_applications: [:logger, :observer, :wx, :runtime_tools],
-      mod: {Kvstore.Application, []}
+      mod: {Kvstore.Application, %{db_path: "db"}}
     ]
   end
 

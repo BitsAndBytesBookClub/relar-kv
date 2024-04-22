@@ -29,7 +29,7 @@ defmodule Kvstore.LSMTreeG do
   require Logger
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: __MODULE__)
+    GenServer.start_link(__MODULE__, args, name: String.to_atom("lsm_tree_#{args.node_id}"))
   end
 
   def init(args) do
@@ -47,8 +47,9 @@ defmodule Kvstore.LSMTreeG do
 
         {:ok, pid} =
           DynamicSupervisor.start_child(
-            Kvstore.LSMLevelSupervisor,
-            {Kvstore.LSMLevelG, %{level: level, iteration: 0, path: args.lsm_path}}
+            Kvstore.LSMLevelSupervisor.name(args.node_id),
+            {Kvstore.LSMLevelG,
+             %{level: level, iteration: 0, path: args.lsm_path, node_id: args.node_id}}
           )
 
         pid
@@ -77,18 +78,18 @@ defmodule Kvstore.LSMTreeG do
   end
 
   def handle_call({:update_level_compaction, level}, _, state) do
-    levels = update_level(level, state.levels, state.compaction_path)
+    levels = update_level(level, state.levels, state.compaction_path, state.node_id)
 
     {:reply, :ok, %{state | levels: levels}}
   end
 
   def handle_call({:update_level_lsm, level}, _, state) do
-    levels = update_level(level, state.levels, state.lsm_path)
+    levels = update_level(level, state.levels, state.lsm_path, state.node_id)
 
     {:reply, :ok, %{state | levels: levels}}
   end
 
-  defp update_level(level, levels, path) do
+  defp update_level(level, levels, path, node_id) do
     Logger.info("LSMTree | Updating LSMLevel: #{inspect(level)}, with levels: #{inspect(levels)}")
 
     found =
@@ -102,7 +103,7 @@ defmodule Kvstore.LSMTreeG do
 
         {:ok, new_pid} =
           DynamicSupervisor.start_child(
-            Kvstore.LSMLevelSupervisor,
+            Kvstore.LSMLevelSupervisor.name(node_id),
             {Kvstore.LSMLevelG, %{level: level, iteration: 0, path: path}}
           )
 
@@ -111,16 +112,16 @@ defmodule Kvstore.LSMTreeG do
       {{_, iteration, pid}, _} ->
         Logger.info("LSMTree | Stopping LSMLevel: #{level}, iteration: #{iteration}")
 
-        args = %{level: level, iteration: iteration + 1, path: path}
+        args = %{level: level, iteration: iteration + 1, path: path, node_id: node_id}
 
         {:ok, new_pid} =
           DynamicSupervisor.start_child(
-            Kvstore.LSMLevelSupervisor,
+            Kvstore.LSMLevelSupervisor.name(node_id),
             Kvstore.LSMLevelG.child_spec(args)
           )
 
         :ok =
-          DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
+          DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor.name(node_id), pid)
 
         Enum.map(levels, fn {l, i, p} ->
           if l == level do
@@ -132,9 +133,9 @@ defmodule Kvstore.LSMTreeG do
     end
   end
 
-  def terminate(_reason, %{levels: levels}) do
+  def terminate(_reason, %{levels: levels, node_id: node_id}) do
     Enum.each(levels, fn {_, _, pid} ->
-      DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor, pid)
+      DynamicSupervisor.terminate_child(Kvstore.LSMLevelSupervisor.name(node_id), pid)
     end)
   end
 end

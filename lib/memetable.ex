@@ -1,11 +1,11 @@
 defmodule Kvstore.Memetable do
-  def set(key, value) do
-    GenServer.call(Kvstore.MemetableG, {:set, key, value})
+  def set(node_id, key, value) do
+    GenServer.call(Kvstore.MemetableG.name(node_id), {:set, key, value})
   end
 
-  def get(key) do
+  def get(node_id, key) do
     result =
-      GenServer.call(Kvstore.MemetableG, {:memtables})
+      GenServer.call(Kvstore.MemetableG.name(node_id), {:memtables})
       |> Enum.reduce_while(nil, fn table, _ ->
         case :ets.lookup(table, key) do
           nil -> {:cont, nil}
@@ -29,21 +29,24 @@ defmodule Kvstore.MemetableG do
 
   require Logger
 
-  def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: __MODULE__)
+  def name(id) do
+    String.to_atom("memetable_#{id}")
   end
 
-  def add_integer_to_atom(atom, integer) do
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+  end
+
+  def table_name(atom, node, integer) do
     atom_as_string = Atom.to_string(atom)
     integer_as_string = Integer.to_string(integer)
-    new_atom_string = atom_as_string <> integer_as_string
-    String.to_atom(new_atom_string)
+    String.to_atom("#{atom_as_string}_#{node}_#{integer_as_string}")
   end
 
   def init(args) do
     id = 0
 
-    table = create_new_table(args.table_prefix, id)
+    table = create_new_table(args.table_prefix, args.node_id, id)
 
     count =
       case File.read(args.memetable_path) do
@@ -91,7 +94,7 @@ defmodule Kvstore.MemetableG do
 
   def handle_cast({:roll}, %{fd: fd, table: table, id: id} = s) do
     Logger.info("Rolling memetable #{id}")
-    new_table = create_new_table(s.table_prefix, id + 1)
+    new_table = create_new_table(s.table_prefix, s.node_id, id + 1)
     write_memetable_to_sst(table)
     :ok = :file.datasync(fd)
     :ok = File.close(fd)
@@ -124,8 +127,8 @@ defmodule Kvstore.MemetableG do
     :ets.info(table, :size)
   end
 
-  defp create_new_table(table_prefix, id) do
-    :ets.new(add_integer_to_atom(table_prefix, id), [:ordered_set, :public, :named_table])
+  defp create_new_table(table_prefix, node_id, id) do
+    :ets.new(table_name(table_prefix, node_id, id), [:ordered_set, :public, :named_table])
   end
 
   defp write_memetable_to_sst(table) do

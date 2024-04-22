@@ -1,14 +1,14 @@
 defmodule Kvstore.SSTList do
-  def list() do
-    GenServer.call(Kvstore.SSTListG, {:list})
+  def list(node_id) do
+    GenServer.call(Kvstore.SSTListG.name(node_id), {:list})
   end
 
-  def add(name) do
-    GenServer.call(Kvstore.SSTListG, {:add_level, name})
+  def add(node_id, name) do
+    GenServer.call(Kvstore.SSTListG.name(node_id), {:add_level, name})
   end
 
-  def remove(files) do
-    GenServer.call(Kvstore.SSTListG, {:remove, files})
+  def remove(node_id, files) do
+    GenServer.call(Kvstore.SSTListG.name(node_id), {:remove, files})
   end
 end
 
@@ -17,13 +17,17 @@ defmodule Kvstore.SSTListG do
 
   require Logger
 
-  def start_link(path) do
-    GenServer.start_link(__MODULE__, path, name: __MODULE__)
+  def name(id) do
+    String.to_atom("sst_list_#{id}")
   end
 
-  def init(path) do
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+  end
+
+  def init(args) do
     files =
-      File.ls!(path)
+      File.ls!(args.path)
       |> Enum.map(&String.to_integer/1)
       |> Enum.sort()
       |> Enum.reverse()
@@ -35,14 +39,14 @@ defmodule Kvstore.SSTListG do
 
         {:ok, pid} =
           DynamicSupervisor.start_child(
-            Kvstore.SSTFileSupervisor,
-            {Kvstore.SSTFileG, %{file: file, path: path}}
+            Kvstore.SSTFileSupervisor.name(args.node_id),
+            {Kvstore.SSTFileG, %{file: file, path: args.path}}
           )
 
         pid
       end)
 
-    {:ok, %{files: Enum.zip([files, pids]), path: path}}
+    {:ok, %{files: Enum.zip([files, pids]), path: args.path}}
   end
 
   def handle_call({:list}, _from, %{files: files} = state) do

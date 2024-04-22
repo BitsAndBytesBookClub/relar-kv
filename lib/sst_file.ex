@@ -62,8 +62,12 @@ end
 defmodule Kvstore.SSTFileSupervisor do
   use DynamicSupervisor
 
-  def start_link(init_arg) do
-    DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
+  def name(id) do
+    String.to_atom("sst_file_#{id}")
+  end
+
+  def start_link(args) do
+    DynamicSupervisor.start_link(__MODULE__, args, name: name(args.node_id))
   end
 
   def init(_init_arg) do

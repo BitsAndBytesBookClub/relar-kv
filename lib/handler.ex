@@ -124,7 +124,7 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:get, key}, _from, state) do
-    val = Kvstore.Memetable.get(key)
+    val = Kvstore.Memetable.get(1, key)
 
     val =
       case val do
@@ -152,7 +152,7 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:set, key, value}, _from, state) do
-    Kvstore.Memetable.set(key, value)
+    Kvstore.Memetable.set(1, key, value)
     {:reply, :ok, state}
   end
 end

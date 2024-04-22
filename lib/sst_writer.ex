@@ -9,12 +9,12 @@ defmodule Kvstore.SSTWriterG do
 
   require Logger
 
-  def start_link(path) do
-    GenServer.start_link(__MODULE__, path, name: __MODULE__)
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: String.to_atom("sst_writer_#{args.node_id}"))
   end
 
-  def init(path) do
-    {:ok, %{path: path}}
+  def init(args) do
+    {:ok, %{path: args.path}}
   end
 
   def handle_call({:write, table}, _from, %{path: path} = state) do
