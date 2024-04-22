@@ -26,7 +26,7 @@ defmodule Kvstore.Node do
 
     trash_path = "#{db_path}/trash"
 
-    File.mkdir(db_path)
+    File.mkdir_p!(db_path)
     File.mkdir(lsm_path)
     File.mkdir(lsm0_path)
     File.mkdir(sst_path)

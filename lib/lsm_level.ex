@@ -42,7 +42,7 @@ defmodule Kvstore.LSMLevelG do
     GenServer.start_link(__MODULE__, args, name: name(args.node_id, level, i))
   end
 
-  def init(%{level: level, iteration: i, path: path}) do
+  def init(%{level: level, iteration: i, path: path} = args) do
     Process.flag(:trap_exit, true)
 
     full_path = "#{path}/#{level}"
@@ -56,7 +56,7 @@ defmodule Kvstore.LSMLevelG do
       Enum.map(files, fn file ->
         {:ok, pid} =
           DynamicSupervisor.start_child(
-            Kvstore.LSMPartSupervisor,
+            Kvstore.LSMPartSupervisor.name(args.node_id),
             {Kvstore.LSMPartG, %{file: file, path: full_path, iteration: i}}
           )
 
@@ -75,14 +75,14 @@ defmodule Kvstore.LSMLevelG do
       "LSMLevel | Files in LSMLevel #{level}: #{inspect(files)}, with bounds: #{inspect(bounds)}"
     )
 
-    {:ok, %{files: files, bounds: bounds, level: level, parts: parts}}
+    {:ok, Map.merge(args, %{files: files, parts: parts, bounds: bounds})}
   end
 
-  def terminate(reason, %{parts: parts}) do
+  def terminate(reason, state) do
     Logger.info("LSMLevel | Terminating LSMLevel due to: #{inspect(reason)}")
 
-    Enum.each(parts, fn pid ->
-      DynamicSupervisor.terminate_child(Kvstore.LSMPartSupervisor, pid)
+    Enum.each(state.parts, fn pid ->
+      DynamicSupervisor.terminate_child(Kvstore.LSMPartSupervisor.name(state.node_id), pid)
     end)
   end
 

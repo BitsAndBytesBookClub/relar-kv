@@ -84,8 +84,12 @@ end
 defmodule Kvstore.LSMPartSupervisor do
   use DynamicSupervisor
 
+  def name(node_id) do
+    String.to_atom("lsm_part_supervisor_#{node_id}")
+  end
+
   def start_link(args) do
-    DynamicSupervisor.start_link(__MODULE__, args, name: String.to_atom("lsm_part_supervisor_#{args.node_id}"))
+    DynamicSupervisor.start_link(__MODULE__, args, name: name(args.node_id))
   end
 
   def init(_init_arg) do

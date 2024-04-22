@@ -84,7 +84,8 @@ defmodule Kvstore.MemetableG do
 
     case [s.count, s.old_table, s.called_roll] do
       [n, nil, false] when n > s.max_size ->
-        GenServer.cast(__MODULE__, {:roll})
+        GenServer.cast(__MODULE__.name(s.node_id), {:roll})
+
         {:reply, :ok, %{s | count: s.count + 1, called_roll: true}}
 
       _ ->
@@ -95,7 +96,7 @@ defmodule Kvstore.MemetableG do
   def handle_cast({:roll}, %{fd: fd, table: table, id: id} = s) do
     Logger.info("Rolling memetable #{id}")
     new_table = create_new_table(s.table_prefix, s.node_id, id + 1)
-    write_memetable_to_sst(table)
+    write_memetable_to_sst(s.node_id, table)
     :ok = :file.datasync(fd)
     :ok = File.close(fd)
     :ok = File.rm(s.memetable_path)
@@ -131,7 +132,7 @@ defmodule Kvstore.MemetableG do
     :ets.new(table_name(table_prefix, node_id, id), [:ordered_set, :public, :named_table])
   end
 
-  defp write_memetable_to_sst(table) do
-    Kvstore.SSTWriter.write(table)
+  defp write_memetable_to_sst(node_id, table) do
+    Kvstore.SSTWriter.write(node_id, table)
   end
 end

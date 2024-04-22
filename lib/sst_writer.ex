@@ -1,6 +1,6 @@
 defmodule Kvstore.SSTWriter do
-  def write(stream) do
-    GenServer.call(Kvstore.SSTWriterG, {:write, stream})
+  def write(node_id, stream) do
+    GenServer.call(Kvstore.SSTWriterG.name(node_id), {:write, stream})
   end
 end
 
@@ -9,12 +9,16 @@ defmodule Kvstore.SSTWriterG do
 
   require Logger
 
+  def name(id) do
+    String.to_atom("sst_writer_#{id}")
+  end
+
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: String.to_atom("sst_writer_#{args.node_id}"))
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
   end
 
   def init(args) do
-    {:ok, %{path: args.path}}
+    {:ok, args}
   end
 
   def handle_call({:write, table}, _from, %{path: path} = state) do

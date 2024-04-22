@@ -123,7 +123,7 @@ defmodule Kvstore.Compaction.LSM do
 
     Kvstore.TrashBin.empty(cfg.trash_path)
 
-    Kvstore.LSMTree.update_level_from_lsm(level)
+    Kvstore.LSMTree.update_level_from_lsm(cfg.node_id, level)
 
     Logger.info("Finished compacting LSM Level #{level}")
   end
@@ -224,7 +224,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
 
     do_the_compaction(cfg, sst_files)
 
-    Kvstore.LSMTree.update_level_from_compaction(0)
+    Kvstore.LSMTree.update_level_from_compaction(node_id, 0)
 
     Kvstore.TrashBin.empty(cfg.trash_path)
 

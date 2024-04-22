@@ -40,13 +40,13 @@ defmodule Kvstore.SSTListG do
         {:ok, pid} =
           DynamicSupervisor.start_child(
             Kvstore.SSTFileSupervisor.name(args.node_id),
-            {Kvstore.SSTFileG, %{file: file, path: args.path}}
+            {Kvstore.SSTFileG, %{node_id: args.node_id, file: file, path: args.path}}
           )
 
         pid
       end)
 
-    {:ok, %{files: Enum.zip([files, pids]), path: args.path}}
+    {:ok, Map.merge(args, %{files: Enum.zip([files, pids])})}
   end
 
   def handle_call({:list}, _from, %{files: files} = state) do
@@ -56,6 +56,9 @@ defmodule Kvstore.SSTListG do
       files
       |> Enum.map(&elem(&1, 0))
       |> Enum.map(&String.to_atom/1)
+      |> Enum.map(fn file ->
+        Kvstore.SSTFileG.name(state.node_id, file)
+      end)
 
     {:reply, atom_files, state}
   end
@@ -69,7 +72,9 @@ defmodule Kvstore.SSTListG do
           Logger.error("File not found: #{file}")
 
         {_, pid} ->
-          :ok = DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor, pid)
+          :ok =
+            DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor.name(state.node_id), pid)
+
           File.rm!(path <> "/" <> file)
       end
     end)
@@ -83,8 +88,8 @@ defmodule Kvstore.SSTListG do
 
     {:ok, pid} =
       DynamicSupervisor.start_child(
-        Kvstore.SSTFileSupervisor,
-        {Kvstore.SSTFileG, %{file: name, path: state.path}}
+        Kvstore.SSTFileSupervisor.name(state.node_id),
+        {Kvstore.SSTFileG, %{node_id: state.node_id, file: name, path: state.path}}
       )
 
     {:reply, :ok, %{state | files: [{name, pid} | state.files]}}

@@ -22,8 +22,12 @@ defmodule Kvstore.SSTFileG do
 
   require Logger
 
+  def name(node_id, file) do
+    String.to_atom("sst_file_#{node_id}_#{file}")
+  end
+
   def start_link(%{file: file} = args) do
-    GenServer.start_link(__MODULE__, args, name: String.to_atom(file))
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id, file))
   end
 
   def init(%{file: file, path: path}) do
