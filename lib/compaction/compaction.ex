@@ -56,7 +56,7 @@ defmodule Kvstore.CompactionG do
     if Enum.count(ssts) < state.max_ssts do
       {:noreply, state}
     else
-      Kvstore.Compaction.SSTToLevel0.compact(state.l0_compactor, ssts)
+      Kvstore.Compaction.SSTToLevel0.compact(state.node_id, state.l0_compactor, ssts)
       GenServer.cast(:compaction, {:add_lsm_file, "0"})
       {:noreply, state}
     end
@@ -110,7 +110,7 @@ defmodule Kvstore.Compaction.LSM do
       |> Kernel.+(1)
       |> Integer.to_string()
 
-    Kvstore.LSMTree.update_level_from_compaction(next_level)
+    Kvstore.LSMTree.update_level_from_compaction(cfg.node_id, next_level)
 
     Kvstore.TrashBin.empty(cfg.trash_path)
 

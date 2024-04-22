@@ -1,25 +1,25 @@
 defmodule Kvstore.LSMTree do
-  def get_levels() do
-    GenServer.call(Kvstore.LSMTreeG, {:get_levels})
+  def get_levels(node_id) do
+    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:get_levels})
   end
 
-  def update_level_from_compaction(level) when is_integer(level) do
+  def update_level_from_compaction(node_id, level) when is_integer(level) do
     GenServer.call(
-      Kvstore.LSMTreeG,
+      Kvstore.LSMTreeG.name(node_id),
       {:update_level_compaction, Integer.to_string(level)}
     )
   end
 
-  def update_level_from_compaction(level) when is_binary(level) do
-    GenServer.call(Kvstore.LSMTreeG, {:update_level_compaction, level})
+  def update_level_from_compaction(node_id, level) when is_binary(level) do
+    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:update_level_compaction, level})
   end
 
-  def update_level_from_lsm(level) when is_integer(level) do
-    GenServer.call(Kvstore.LSMTreeG, {:update_level_lsm, Integer.to_string(level)})
+  def update_level_from_lsm(node_id, level) when is_integer(level) do
+    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:update_level_lsm, Integer.to_string(level)})
   end
 
-  def update_level_from_lsm(level) when is_binary(level) do
-    GenServer.call(Kvstore.LSMTreeG, {:update_level_lsm, level})
+  def update_level_from_lsm(node_id, level) when is_binary(level) do
+    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:update_level_lsm, level})
   end
 end
 
@@ -28,8 +28,12 @@ defmodule Kvstore.LSMTreeG do
 
   require Logger
 
+  def name(id) do
+    String.to_atom("lsm_tree_#{id}")
+  end
+
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: String.to_atom("lsm_tree_#{args.node_id}"))
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
   end
 
   def init(args) do
