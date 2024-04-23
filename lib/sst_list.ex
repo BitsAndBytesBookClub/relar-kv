@@ -66,18 +66,26 @@ defmodule Kvstore.SSTListG do
   def handle_call({:remove, files}, _from, %{files: all_files, path: path} = state) do
     Logger.info("Removing SST files: #{inspect(files)}")
 
-    Enum.each(files, fn file ->
-      case Enum.find(all_files, fn {f, _} -> f == file end) do
-        nil ->
-          Logger.error("File not found: #{file}")
+    files =
+      files
+      |> Enum.map(fn file -> String.split(file, "_") |> List.last() end)
+      |> Enum.map(fn file ->
+        case Enum.find(all_files, fn {f, _} -> f == file end) do
+          nil ->
+            Logger.error("File not found: #{file}")
 
-        {_, pid} ->
-          :ok =
-            DynamicSupervisor.terminate_child(Kvstore.SSTFileSupervisor.name(state.node_id), pid)
+          {_, pid} ->
+            :ok =
+              DynamicSupervisor.terminate_child(
+                Kvstore.SSTFileSupervisor.name(state.node_id),
+                pid
+              )
 
-          File.rm!(path <> "/" <> file)
-      end
-    end)
+            :ok = File.rm!(path <> "/" <> file)
+        end
+
+        file
+      end)
 
     {:reply, :ok,
      %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}

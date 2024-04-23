@@ -65,7 +65,7 @@ defmodule Kvstore.Node do
        %{
          table_prefix: :memetable,
          memetable_path: memetable_path,
-         max_size: 100,
+         max_size: 3,
          node_id: args.id
        }},
       {Kvstore.CompactionG,

@@ -43,8 +43,8 @@ defmodule Kvstore.SSTWriterG do
     :ok = :file.close(file_descriptor)
 
     Kvstore.SSTList.add(state.node_id, file_name)
-    Kvstore.Memetable.done_writing()
-    Kvstore.Compaction.add_sst()
+    Kvstore.Memetable.done_writing(state.node_id)
+    Kvstore.Compaction.add_sst(state.node_id)
 
     {:reply, :ok, state}
   end

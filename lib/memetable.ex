@@ -19,8 +19,8 @@ defmodule Kvstore.Memetable do
     end
   end
 
-  def done_writing() do
-    GenServer.cast(Kvstore.MemetableG, {:done_writing})
+  def done_writing(node_id) do
+    :ok = GenServer.cast(Kvstore.MemetableG.name(node_id), {:done_writing})
   end
 end
 
@@ -94,7 +94,7 @@ defmodule Kvstore.MemetableG do
   end
 
   def handle_cast({:roll}, %{fd: fd, table: table, id: id} = s) do
-    Logger.info("Rolling memetable #{id}")
+    # Logger.info("Rolling memetable #{id}")
     new_table = create_new_table(s.table_prefix, s.node_id, id + 1)
     write_memetable_to_sst(s.node_id, table)
     :ok = :file.datasync(fd)

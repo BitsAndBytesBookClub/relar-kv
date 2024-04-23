@@ -1,10 +1,10 @@
 defmodule Kvstore.Compaction do
-  def add_sst() do
-    GenServer.cast(:compaction, :add_sst)
+  def add_sst(node_id) do
+    :ok = GenServer.cast(Kvstore.CompactionG.name(node_id), :add_sst)
   end
 
-  def add_lsm_file(level) do
-    GenServer.cast(:compaction, {:add_lsm_file, level})
+  def add_lsm_file(node_id, level) do
+    :ok = GenServer.cast(Kvstore.CompactionG.name(node_id), {:add_lsm_file, level})
   end
 end
 
@@ -13,9 +13,12 @@ defmodule Kvstore.CompactionG do
 
   require Logger
 
+  def name(id) do
+    String.to_atom("compaction_#{id}")
+  end
+
   def start_link(args) do
-    __MODULE__
-    |> GenServer.start_link(args, name: String.to_atom("compaction_#{args.node_id}"))
+    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
   end
 
   def init(args) do

@@ -2,7 +2,12 @@ defmodule Compaction.SSTReader do
   def data(files, path) do
     ssts =
       files
-      |> Enum.map(&String.to_integer/1)
+      |> Enum.map(fn file ->
+        file
+        |> String.split("_")
+        |> List.last()
+        |> String.to_integer()
+      end)
       |> Enum.sort()
       |> Enum.map(&Integer.to_string/1)
 

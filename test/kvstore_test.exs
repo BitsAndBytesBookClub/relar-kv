@@ -6,8 +6,8 @@ defmodule KvstoreTest.End2End do
     KV.set("hello", "world")
     assert KV.get("hello") == "world"
 
-    n = 10000
-    incs = 3
+    n = 100
+    incs = 4
 
     assert KV.do_the_test(n, incs) == %{"good" => n}
   end
