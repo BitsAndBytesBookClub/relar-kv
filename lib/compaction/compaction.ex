@@ -34,7 +34,7 @@ defmodule Kvstore.CompactionG do
 
     Enum.each(lsms, fn {level, count} ->
       if count > 10 do
-        GenServer.cast(:compaction, {:add_lsm_file, level})
+        GenServer.cast(Kvstore.compactiong().name(args.node_id), {:add_lsm_file, level})
       end
     end)
 
@@ -60,7 +60,7 @@ defmodule Kvstore.CompactionG do
       {:noreply, state}
     else
       Kvstore.Compaction.SSTToLevel0.compact(state.node_id, state.l0_compactor, ssts)
-      GenServer.cast(:compaction, {:add_lsm_file, "0"})
+      GenServer.cast(Kvstore.CompactionG.name(state.node_id), {:add_lsm_file, "0"})
       {:noreply, state}
     end
   end
