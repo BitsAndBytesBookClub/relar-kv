@@ -10,6 +10,7 @@ defmodule Kvstore.Application do
     children = [
       Supervisor.child_spec({Kvstore.Node, %{id: 1, db_path: "db/node1"}}, id: :node1),
       Supervisor.child_spec({Kvstore.Node, %{id: 2, db_path: "db/node2"}}, id: :node2),
+      Supervisor.child_spec({Kvstore.Node, %{id: 3, db_path: "db/node3"}}, id: :node3),
       Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),
       Supervisor.child_spec({Kvstore.Handler, %{name: :h2}}, id: :h2)
     ]

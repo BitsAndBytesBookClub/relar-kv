@@ -4,6 +4,8 @@
 ![demo map](demo_map.png)
 ![demo](demo.gif)
 
+![demo](sharding.gif)
+
 `mix deps.get` - get dependencies
 
 `iex -S mix` - start the application

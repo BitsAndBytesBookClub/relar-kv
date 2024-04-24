@@ -99,7 +99,9 @@ defmodule Kvstore.Handler do
   end
 
   def from_sst(key) do
-    Kvstore.SSTList.list(1)
+    node = Kvstore.Key.node(key)
+
+    Kvstore.SSTList.list(node)
     |> Enum.reduce_while(nil, fn sst, _ ->
       case Kvstore.SSTFile.get(sst, key) do
         nil -> {:cont, nil}
@@ -124,7 +126,8 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:get, key}, _from, state) do
-    val = Kvstore.Memetable.get(1, key)
+    node = Kvstore.Key.node(key)
+    val = Kvstore.Memetable.get(node, key)
 
     val =
       case val do
@@ -142,7 +145,8 @@ defmodule Kvstore.Handler do
         nil ->
           # Logger.info("Key not found in SSTables: #{key}")
 
-          from_lsm(1, key)
+          node = Kvstore.Key.node(key)
+          from_lsm(node, key)
 
         v ->
           v
@@ -152,7 +156,8 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:set, key, value}, _from, state) do
-    Kvstore.Memetable.set(1, key, value)
+    node = Kvstore.Key.node(key)
+    Kvstore.Memetable.set(node, key, value)
     {:reply, :ok, state}
   end
 end
@@ -166,5 +171,21 @@ defmodule Random do
 
   def value() do
     Enum.reduce(1..10, "", fn _i, acc -> acc <> Enum.random(@letters) end)
+  end
+end
+
+defmodule Kvstore.Key do
+  def node(key) do
+    first = String.at(key, 0)
+
+    case first do
+      ch when "0" <= ch and ch <= "2" -> 1
+      ch when "3" <= ch and ch <= "5" -> 2
+      ch when "6" <= ch and ch <= "9" -> 3
+      ch when "a" <= ch and ch <= "h" -> 1
+      ch when "i" <= ch and ch <= "p" -> 2
+      ch when "q" <= ch and ch <= "z" -> 3
+      _ -> 1
+    end
   end
 end
