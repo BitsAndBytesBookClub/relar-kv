@@ -4,7 +4,9 @@ defmodule Compaction.Writer do
   def data(path, count \\ 100) do
     File.mkdir_p!(path)
 
-    {:ok, fd} = :file.open(path <> "/a", [:raw, :write, :utf8])
+    {:ok, fd} =
+      :file.open(path <> "/a", [:raw, :write, :utf8])
+
     {fd, 0, "a", path, count}
   end
 
@@ -19,7 +21,10 @@ defmodule Compaction.Writer do
 
         :file.close(fd)
         next_letter = NextLetter.get_next_letter(letter)
-        {:ok, fd} = :file.open(path <> "/#{next_letter}", [:raw, :write, :utf8])
+
+        {:ok, fd} =
+          :file.open(path <> "/#{next_letter}", [:raw, :write, :utf8])
+
         :file.write(fd, "#{key},#{value}")
         {fd, 1, next_letter, path, max_count}
 
@@ -34,8 +39,8 @@ defmodule Compaction.Writer do
       :ok ->
         :ok
 
-      {:error, reason} ->
-        Logger.error("Error syncing file: #{inspect(reason)}")
+      {:error, _reason} ->
+        # Logger.error("Error syncing file: #{inspect(reason)}")
         :error
     end
 

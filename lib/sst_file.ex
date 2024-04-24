@@ -59,7 +59,8 @@ defmodule Kvstore.SSTFileG do
 
   def terminate(_reason, %{fd: fd}) do
     # Logger.info("Closing SST file #{inspect(reason)}")
-    File.close(fd)
+    :ok = File.close(fd)
+    :ok
   end
 end
 

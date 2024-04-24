@@ -25,7 +25,7 @@ defmodule Kvstore.CompactionG do
     ssts = Enum.count(File.ls!(args.sst_path))
 
     if ssts > args.max_ssts do
-      GenServer.cast(:compaction, :add_sst)
+      :ok = GenServer.cast(Kvstore.CompactionG.name(args.node_id), :add_sst)
     end
 
     lsms =
@@ -34,7 +34,7 @@ defmodule Kvstore.CompactionG do
 
     Enum.each(lsms, fn {level, count} ->
       if count > 10 do
-        GenServer.cast(Kvstore.compactiong().name(args.node_id), {:add_lsm_file, level})
+        :ok = GenServer.cast(Kvstore.CompactionG.name(args.node_id), {:add_lsm_file, level})
       end
     end)
 
@@ -60,7 +60,7 @@ defmodule Kvstore.CompactionG do
       {:noreply, state}
     else
       Kvstore.Compaction.SSTToLevel0.compact(state.node_id, state.l0_compactor, ssts)
-      GenServer.cast(Kvstore.CompactionG.name(state.node_id), {:add_lsm_file, "0"})
+      :ok = GenServer.cast(Kvstore.CompactionG.name(state.node_id), {:add_lsm_file, "0"})
       {:noreply, state}
     end
   end
@@ -79,10 +79,15 @@ defmodule Kvstore.CompactionG do
         |> Integer.to_string()
 
       lsm_compactor =
-        Kvstore.Compaction.LSM.init(state.lsm_path, state.trash_path, state.compacted_lsm_dir)
+        Kvstore.Compaction.LSM.init(
+          state.node_id,
+          state.lsm_path,
+          state.trash_path,
+          state.compacted_lsm_dir
+        )
 
       Kvstore.Compaction.LSM.compact(lsm_compactor, level)
-      GenServer.cast(:compaction, {:add_lsm_file, next_level})
+      :ok = GenServer.cast(Kvstore.CompactionG.name(state.node_id), {:add_lsm_file, next_level})
     end
 
     {:noreply, state}
@@ -92,13 +97,14 @@ end
 defmodule Kvstore.Compaction.LSM do
   require Logger
 
-  defstruct path: nil, trash_path: nil, new_level_path: nil
+  defstruct path: nil, trash_path: nil, new_level_path: nil, node_id: nil
 
-  def init(path, trash_path, new_level_path) do
+  def init(node_id, path, trash_path, new_level_path) do
     %__MODULE__{
       path: path <> "/",
       trash_path: trash_path,
-      new_level_path: new_level_path
+      new_level_path: new_level_path,
+      node_id: node_id
     }
   end
 
