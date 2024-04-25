@@ -2,15 +2,31 @@ defmodule KV do
   require Logger
 
   def set(key, value) do
-    GenServer.call(handler(), {:set, key, value})
+    GenServer.call({:global, handler()}, {:set, key, value})
   end
 
   def get(key) do
-    GenServer.call(handler(), {:get, key})
+    GenServer.call({:global, handler()}, {:get, key})
   end
 
   defp handler() do
-    Enum.random([:h1, :h2])
+    Enum.random(handlers(Node.self()))
+  end
+
+  defp handlers(:nonode@nohost), do: [:h1, :h2]
+
+  defp handlers(this_node) do
+    [this_node | Node.list()]
+    |> Enum.map(fn node ->
+      "node" <> node_id =
+        node
+        |> Atom.to_string()
+        |> String.split("@")
+        |> List.first()
+
+      "h" <> node_id
+    end)
+    |> dbg()
   end
 
   def add_random_keys(n) do
@@ -91,7 +107,7 @@ defmodule Kvstore.Handler do
   require Logger
 
   def start_link(%{name: n}) do
-    GenServer.start_link(__MODULE__, %{}, name: n)
+    GenServer.start_link(__MODULE__, %{}, name: {:global, n})
   end
 
   def init(_args) do
@@ -180,11 +196,11 @@ defmodule Kvstore.Key do
 
     case first do
       ch when "0" <= ch and ch <= "2" -> 1
-      ch when "3" <= ch and ch <= "5" -> 2
-      ch when "6" <= ch and ch <= "9" -> 3
+      ch when "3" <= ch and ch <= "5" -> 1
+      ch when "6" <= ch and ch <= "9" -> 1
       ch when "a" <= ch and ch <= "h" -> 1
-      ch when "i" <= ch and ch <= "p" -> 2
-      ch when "q" <= ch and ch <= "z" -> 3
+      ch when "i" <= ch and ch <= "p" -> 1
+      ch when "q" <= ch and ch <= "z" -> 1
       _ -> 1
     end
   end

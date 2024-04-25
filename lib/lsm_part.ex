@@ -26,7 +26,9 @@ defmodule Kvstore.LSMPartG do
 
     Logger.info("Starting LSMPart: #{name}")
 
-    GenServer.start_link(__MODULE__, %{file: file, path: path}, name: String.to_atom(name))
+    GenServer.start_link(__MODULE__, %{file: file, path: path},
+      name: {:global, String.to_atom(name)}
+    )
   end
 
   def init(%{file: file, path: path}) do

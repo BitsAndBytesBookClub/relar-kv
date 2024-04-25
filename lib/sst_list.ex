@@ -1,14 +1,14 @@
 defmodule Kvstore.SSTList do
   def list(node_id) do
-    GenServer.call(Kvstore.SSTListG.name(node_id), {:list})
+    GenServer.call({:global, Kvstore.SSTListG.name(node_id)}, {:list})
   end
 
   def add(node_id, name) do
-    GenServer.call(Kvstore.SSTListG.name(node_id), {:add_level, name})
+    GenServer.call({:global, Kvstore.SSTListG.name(node_id)}, {:add_level, name})
   end
 
   def remove(node_id, files) do
-    GenServer.call(Kvstore.SSTListG.name(node_id), {:remove, files})
+    GenServer.call({:global, Kvstore.SSTListG.name(node_id)}, {:remove, files})
   end
 end
 
@@ -22,7 +22,7 @@ defmodule Kvstore.SSTListG do
   end
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id)})
   end
 
   def init(args) do

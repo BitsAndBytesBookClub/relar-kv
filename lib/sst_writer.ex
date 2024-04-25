@@ -1,6 +1,6 @@
 defmodule Kvstore.SSTWriter do
   def write(node_id, stream) do
-    GenServer.call(Kvstore.SSTWriterG.name(node_id), {:write, stream})
+    GenServer.call({:global, Kvstore.SSTWriterG.name(node_id)}, {:write, stream})
   end
 end
 
@@ -14,7 +14,7 @@ defmodule Kvstore.SSTWriterG do
   end
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id)})
   end
 
   def init(args) do

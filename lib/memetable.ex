@@ -1,11 +1,11 @@
 defmodule Kvstore.Memetable do
   def set(node_id, key, value) do
-    GenServer.call(Kvstore.MemetableG.name(node_id), {:set, key, value})
+    GenServer.call({:global, Kvstore.MemetableG.name(node_id)}, {:set, key, value})
   end
 
   def get(node_id, key) do
     result =
-      GenServer.call(Kvstore.MemetableG.name(node_id), {:memtables})
+      GenServer.call({:global, Kvstore.MemetableG.name(node_id)}, {:memtables})
       |> Enum.reduce_while(nil, fn table, _ ->
         case :ets.lookup(table, key) do
           nil -> {:cont, nil}
@@ -20,7 +20,7 @@ defmodule Kvstore.Memetable do
   end
 
   def done_writing(node_id) do
-    :ok = GenServer.cast(Kvstore.MemetableG.name(node_id), {:done_writing})
+    :ok = GenServer.cast({:global, Kvstore.MemetableG.name(node_id)}, {:done_writing})
   end
 end
 
@@ -34,7 +34,7 @@ defmodule Kvstore.MemetableG do
   end
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id)})
   end
 
   def table_name(atom, node, integer) do
@@ -84,7 +84,7 @@ defmodule Kvstore.MemetableG do
 
     case [s.count, s.old_table, s.called_roll] do
       [n, nil, false] when n > s.max_size ->
-        GenServer.cast(__MODULE__.name(s.node_id), {:roll})
+        GenServer.cast({:global, __MODULE__.name(s.node_id)}, {:roll})
 
         {:reply, :ok, %{s | count: s.count + 1, called_roll: true}}
 

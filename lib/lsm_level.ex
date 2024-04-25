@@ -39,7 +39,7 @@ defmodule Kvstore.LSMLevelG do
   end
 
   def start_link(%{level: level, iteration: i, path: _path} = args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id, level, i))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id, level, i)})
   end
 
   def init(%{level: level, iteration: i, path: path} = args) do

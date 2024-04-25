@@ -3,7 +3,7 @@ defmodule Kvstore.SSTFile do
 
   def get(sst, key) do
     try do
-      GenServer.call(sst, {:get, key})
+      GenServer.call({:global, sst}, {:get, key})
     catch
       ArgumentError ->
         # This error occurs if the pid is not a valid process.
@@ -27,7 +27,7 @@ defmodule Kvstore.SSTFileG do
   end
 
   def start_link(%{file: file} = args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id, file))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id, file)})
   end
 
   def init(%{file: file, path: path}) do

@@ -1,10 +1,10 @@
 defmodule Kvstore.Compaction do
   def add_sst(node_id) do
-    :ok = GenServer.cast(Kvstore.CompactionG.name(node_id), :add_sst)
+    :ok = GenServer.cast({:global, Kvstore.CompactionG.name(node_id)}, :add_sst)
   end
 
   def add_lsm_file(node_id, level) do
-    :ok = GenServer.cast(Kvstore.CompactionG.name(node_id), {:add_lsm_file, level})
+    :ok = GenServer.cast({:global, Kvstore.CompactionG.name(node_id)}, {:add_lsm_file, level})
   end
 end
 
@@ -18,14 +18,14 @@ defmodule Kvstore.CompactionG do
   end
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id)})
   end
 
   def init(args) do
     ssts = Enum.count(File.ls!(args.sst_path))
 
     if ssts > args.max_ssts do
-      :ok = GenServer.cast(Kvstore.CompactionG.name(args.node_id), :add_sst)
+      :ok = GenServer.cast({:global, Kvstore.CompactionG.name(args.node_id)}, :add_sst)
     end
 
     lsms =
@@ -34,7 +34,11 @@ defmodule Kvstore.CompactionG do
 
     Enum.each(lsms, fn {level, count} ->
       if count > 10 do
-        :ok = GenServer.cast(Kvstore.CompactionG.name(args.node_id), {:add_lsm_file, level})
+        :ok =
+          GenServer.cast(
+            {:global, Kvstore.CompactionG.name(args.node_id)},
+            {:add_lsm_file, level}
+          )
       end
     end)
 
@@ -60,7 +64,10 @@ defmodule Kvstore.CompactionG do
       {:noreply, state}
     else
       Kvstore.Compaction.SSTToLevel0.compact(state.node_id, state.l0_compactor, ssts)
-      :ok = GenServer.cast(Kvstore.CompactionG.name(state.node_id), {:add_lsm_file, "0"})
+
+      :ok =
+        GenServer.cast({:global, Kvstore.CompactionG.name(state.node_id)}, {:add_lsm_file, "0"})
+
       {:noreply, state}
     end
   end
@@ -87,7 +94,12 @@ defmodule Kvstore.CompactionG do
         )
 
       Kvstore.Compaction.LSM.compact(lsm_compactor, level)
-      :ok = GenServer.cast(Kvstore.CompactionG.name(state.node_id), {:add_lsm_file, next_level})
+
+      :ok =
+        GenServer.cast(
+          {:global, Kvstore.CompactionG.name(state.node_id)},
+          {:add_lsm_file, next_level}
+        )
     end
 
     {:noreply, state}

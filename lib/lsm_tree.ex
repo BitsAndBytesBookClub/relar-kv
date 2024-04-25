@@ -1,25 +1,28 @@
 defmodule Kvstore.LSMTree do
   def get_levels(node_id) do
-    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:get_levels})
+    GenServer.call({:global, Kvstore.LSMTreeG.name(node_id)}, {:get_levels})
   end
 
   def update_level_from_compaction(node_id, level) when is_integer(level) do
     GenServer.call(
-      Kvstore.LSMTreeG.name(node_id),
+      {:global, Kvstore.LSMTreeG.name(node_id)},
       {:update_level_compaction, Integer.to_string(level)}
     )
   end
 
   def update_level_from_compaction(node_id, level) when is_binary(level) do
-    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:update_level_compaction, level})
+    GenServer.call({:global, Kvstore.LSMTreeG.name(node_id)}, {:update_level_compaction, level})
   end
 
   def update_level_from_lsm(node_id, level) when is_integer(level) do
-    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:update_level_lsm, Integer.to_string(level)})
+    GenServer.call(
+      {:global, Kvstore.LSMTreeG.name(node_id)},
+      {:update_level_lsm, Integer.to_string(level)}
+    )
   end
 
   def update_level_from_lsm(node_id, level) when is_binary(level) do
-    GenServer.call(Kvstore.LSMTreeG.name(node_id), {:update_level_lsm, level})
+    GenServer.call({:global, Kvstore.LSMTreeG.name(node_id)}, {:update_level_lsm, level})
   end
 end
 
@@ -33,7 +36,7 @@ defmodule Kvstore.LSMTreeG do
   end
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: name(args.node_id))
+    GenServer.start_link(__MODULE__, args, name: {:global, name(args.node_id)})
   end
 
   def init(args) do
