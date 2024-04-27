@@ -14,6 +14,10 @@
 
 ![demo](assets/physical_nodes.gif)
 
+## Partitioning
+
+![demo](assets/partitioning.gif)
+
 `mix deps.get` - get dependencies
 
 `iex -S mix` - start the application
