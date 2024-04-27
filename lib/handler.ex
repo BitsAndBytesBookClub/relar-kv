@@ -2,19 +2,26 @@ defmodule KV do
   require Logger
 
   def set(key, value) do
-    GenServer.call({:global, handlers(key, Node.self())}, {:set, key, value})
+    GenServer.call({:global, handlers(key, nodes())}, {:set, key, value})
   end
 
   def get(key) do
-    GenServer.call({:global, handlers(key, Node.self())}, {:get, key})
+    GenServer.call({:global, handlers(key, nodes())}, {:get, key})
   end
 
-  defp handlers(_key, :nonode@nohost), do: Enum.random([:h1, :h2])
+  defp nodes() do
+    case Node.self() do
+      :nonode@nohost ->
+        3
 
-  defp handlers(key, _this_node) do
+      _ ->
+        Enum.count(Node.list()) + 1
+    end
+  end
+
+  defp handlers(key, nodes) do
     num =
-      key
-      |> Kvstore.Key.node_num()
+      Kvstore.Key.partition_number(nodes, key)
 
     String.to_atom("h#{num}")
   end
@@ -96,18 +103,16 @@ defmodule Kvstore.Handler do
 
   require Logger
 
-  def start_link(%{name: n}) do
-    GenServer.start_link(__MODULE__, %{}, name: {:global, n})
+  def start_link(%{name: n} = args) do
+    GenServer.start_link(__MODULE__, args, name: {:global, n})
   end
 
-  def init(_args) do
-    {:ok, %{}}
+  def init(args) do
+    {:ok, %{nodes: args.nodes, current_node: args.current_node}}
   end
 
-  def from_sst(key) do
-    node = Kvstore.Key.node_num(key)
-
-    Kvstore.SSTList.list(node)
+  def from_sst(node_partition, key) do
+    Kvstore.SSTList.list(node_partition)
     |> Enum.reduce_while(nil, fn sst, _ ->
       case Kvstore.SSTFile.get(sst, key) do
         nil -> {:cont, nil}
@@ -132,15 +137,16 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:get, key}, _from, state) do
-    node = Kvstore.Key.node_num(key)
-    val = Kvstore.Memetable.get(node, key)
+    partition = Kvstore.Key.partition_number(state.nodes, key)
+    node_partition = "#{state.current_node}_#{partition}"
+    val = Kvstore.Memetable.get(node_partition, key)
 
     val =
       case val do
         nil ->
           # Logger.info("Key not found in memetable: #{key}")
 
-          from_sst(key)
+          from_sst(node_partition, key)
 
         v ->
           v
@@ -151,8 +157,7 @@ defmodule Kvstore.Handler do
         nil ->
           # Logger.info("Key not found in SSTables: #{key}")
 
-          node = Kvstore.Key.node_num(key)
-          from_lsm(node, key)
+          from_lsm(node_partition, key)
 
         v ->
           v
@@ -162,8 +167,18 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:set, key, value}, _from, state) do
-    node = Kvstore.Key.node_num(key)
-    Kvstore.Memetable.set(node, key, value)
+    partition = Kvstore.Key.partition_number(state.nodes, key)
+
+    Enum.reduce(1..state.nodes, [], fn node, acc ->
+      task =
+        Task.async(fn ->
+          Kvstore.Memetable.set("#{node}_#{partition}", key, value)
+        end)
+
+      [task | acc]
+    end)
+    |> Task.await_many()
+
     {:reply, :ok, state}
   end
 end
@@ -181,9 +196,9 @@ defmodule Random do
 end
 
 defmodule Kvstore.Key do
-  @spec node_num(String.t()) :: atom
-  def node_num(key) do
-    num_nodes = Enum.count(Node.list()) + 1
+  @spec partition_number(integer, String.t()) :: integer
+  def partition_number(nodes, key) do
+    # i assume there are the same number of nodes and partitions
     first = String.at(key, 0) |> String.downcase()
 
     case first do
@@ -192,10 +207,10 @@ defmodule Kvstore.Key do
         1
 
       <<ch>> when ch in ?0..?9 ->
-        partition_for_range(ch, ?0, ?9, num_nodes)
+        partition_for_range(ch, ?0, ?9, nodes)
 
       <<ch>> when ch in ?a..?z ->
-        partition_for_range(ch, ?a, ?z, num_nodes)
+        partition_for_range(ch, ?a, ?z, nodes)
 
       # Default to node 1 for other characters
       _ ->

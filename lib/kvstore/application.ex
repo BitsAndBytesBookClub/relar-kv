@@ -10,12 +10,31 @@ defmodule Kvstore.Application do
     children =
       case Node.self() do
         :nonode@nohost ->
+          partitions = 3
+          nodes = partitions
+
           [
-            Supervisor.child_spec({Kvstore.Node, %{id: 1, db_path: "db/node1"}}, id: :node1),
-            Supervisor.child_spec({Kvstore.Node, %{id: 2, db_path: "db/node2"}}, id: :node2),
-            Supervisor.child_spec({Kvstore.Node, %{id: 3, db_path: "db/node3"}}, id: :node3),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h1}}, id: :h1),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h2}}, id: :h2)
+            Supervisor.child_spec(
+              {Kvstore.Node, %{id: 1, db_path: "db/node1", partitions: partitions}},
+              id: :node1
+            ),
+            Supervisor.child_spec(
+              {Kvstore.Node, %{id: 2, db_path: "db/node2", partitions: partitions}},
+              id: :node2
+            ),
+            Supervisor.child_spec(
+              {Kvstore.Node, %{id: 3, db_path: "db/node3", partitions: partitions}},
+              id: :node3
+            ),
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h1, nodes: nodes}},
+              id: :h1
+            ),
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h2, nodes: nodes}},
+              id: :h2
+            ),
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h3, nodes: nodes}},
+              id: :h3
+            )
           ]
 
         node ->
@@ -27,10 +46,13 @@ defmodule Kvstore.Application do
 
           [
             Supervisor.child_spec(
-              {Kvstore.Node, %{id: String.to_integer(node_id), db_path: "db/node#{node_id}"}},
-              id: String.to_atom("node#{node_id}")
+              {Kvstore.Node,
+               %{id: String.to_integer(node_id), db_path: "db/node#{node_id}", partitions: 3}},
+              id: node_id
             ),
-            Supervisor.child_spec({Kvstore.Handler, %{name: String.to_atom("h#{node_id}")}},
+            Supervisor.child_spec(
+              {Kvstore.Handler,
+               %{name: String.to_atom("h#{node_id}"), nodes: 3, current_node: node_id}},
               id: String.to_atom("h#{node_id}")
             )
           ]
