@@ -1,10 +1,18 @@
 # Kvstore
 
+## DB engine
 
-![demo map](demo_map.png)
-![demo](demo.gif)
+![demo map](assets/demo_map.png)
 
-![demo](sharding.gif)
+![demo](assets/demo.gif)
+
+## Logical sharding
+
+![demo](assets/sharding.gif)
+
+## Physical sharding
+
+![demo](assets/physical_nodes.gif)
 
 `mix deps.get` - get dependencies
 

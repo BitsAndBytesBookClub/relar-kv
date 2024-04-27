@@ -2,30 +2,21 @@ defmodule KV do
   require Logger
 
   def set(key, value) do
-    GenServer.call({:global, handler()}, {:set, key, value})
+    GenServer.call({:global, handlers(key, Node.self())}, {:set, key, value})
   end
 
   def get(key) do
-    GenServer.call({:global, handler()}, {:get, key})
+    GenServer.call({:global, handlers(key, Node.self())}, {:get, key})
   end
 
-  defp handler() do
-    Enum.random(handlers(Node.self()))
-  end
+  defp handlers(_key, :nonode@nohost), do: Enum.random([:h1, :h2])
 
-  defp handlers(:nonode@nohost), do: [:h1, :h2]
+  defp handlers(key, _this_node) do
+    num =
+      key
+      |> Kvstore.Key.node_num()
 
-  defp handlers(this_node) do
-    [this_node | Node.list()]
-    |> Enum.map(fn node ->
-      "node" <> node_id =
-        node
-        |> Atom.to_string()
-        |> String.split("@")
-        |> List.first()
-
-      String.to_atom("h" <> node_id)
-    end)
+    String.to_atom("h#{num}")
   end
 
   def add_random_keys(n) do
@@ -114,7 +105,7 @@ defmodule Kvstore.Handler do
   end
 
   def from_sst(key) do
-    node = Kvstore.Key.node(key)
+    node = Kvstore.Key.node_num(key)
 
     Kvstore.SSTList.list(node)
     |> Enum.reduce_while(nil, fn sst, _ ->
@@ -141,7 +132,7 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:get, key}, _from, state) do
-    node = Kvstore.Key.node(key)
+    node = Kvstore.Key.node_num(key)
     val = Kvstore.Memetable.get(node, key)
 
     val =
@@ -160,7 +151,7 @@ defmodule Kvstore.Handler do
         nil ->
           # Logger.info("Key not found in SSTables: #{key}")
 
-          node = Kvstore.Key.node(key)
+          node = Kvstore.Key.node_num(key)
           from_lsm(node, key)
 
         v ->
@@ -171,7 +162,7 @@ defmodule Kvstore.Handler do
   end
 
   def handle_call({:set, key, value}, _from, state) do
-    node = Kvstore.Key.node(key)
+    node = Kvstore.Key.node_num(key)
     Kvstore.Memetable.set(node, key, value)
     {:reply, :ok, state}
   end
@@ -190,17 +181,31 @@ defmodule Random do
 end
 
 defmodule Kvstore.Key do
-  def node(key) do
-    first = String.at(key, 0)
+  @spec node_num(String.t()) :: atom
+  def node_num(key) do
+    num_nodes = Enum.count(Node.list()) + 1
+    first = String.at(key, 0) |> String.downcase()
 
     case first do
-      ch when "0" <= ch and ch <= "2" -> 1
-      ch when "3" <= ch and ch <= "5" -> 1
-      ch when "6" <= ch and ch <= "9" -> 1
-      ch when "a" <= ch and ch <= "h" -> 1
-      ch when "i" <= ch and ch <= "p" -> 1
-      ch when "q" <= ch and ch <= "z" -> 1
-      _ -> 1
+      # Default to node 1 if the key is empty
+      nil ->
+        1
+
+      <<ch>> when ch in ?0..?9 ->
+        partition_for_range(ch, ?0, ?9, num_nodes)
+
+      <<ch>> when ch in ?a..?z ->
+        partition_for_range(ch, ?a, ?z, num_nodes)
+
+      # Default to node 1 for other characters
+      _ ->
+        1
     end
+  end
+
+  defp partition_for_range(char, start_char, end_char, num_nodes) do
+    range_size = div(end_char - start_char + 1, num_nodes)
+    partition = div(char - start_char, range_size)
+    rem(partition, num_nodes) + 1
   end
 end
