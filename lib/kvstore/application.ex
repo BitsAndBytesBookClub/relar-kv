@@ -24,7 +24,6 @@ defmodule Kvstore.Application do
             |> Atom.to_string()
             |> String.split("@")
             |> List.first()
-            |> dbg()
 
           [
             Supervisor.child_spec(

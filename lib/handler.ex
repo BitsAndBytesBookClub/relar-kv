@@ -24,9 +24,8 @@ defmodule KV do
         |> String.split("@")
         |> List.first()
 
-      "h" <> node_id
+      String.to_atom("h" <> node_id)
     end)
-    |> dbg()
   end
 
   def add_random_keys(n) do
