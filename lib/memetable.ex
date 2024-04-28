@@ -50,7 +50,7 @@ defmodule Kvstore.MemetableG do
 
     count =
       case File.read(args.memetable_path) do
-        {:ok, _} -> load_memetable(args.memtable_path, table)
+        {:ok, _} -> load_memetable(args.memetable_path, table)
         {:error, _} -> 0
       end
 
