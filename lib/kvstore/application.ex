@@ -26,13 +26,13 @@ defmodule Kvstore.Application do
               {Kvstore.Node, %{id: 3, db_path: "db/node3", partitions: partitions}},
               id: :node3
             ),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h1, nodes: nodes}},
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h1, nodes: nodes, current_node: 1}},
               id: :h1
             ),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h2, nodes: nodes}},
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h2, nodes: nodes, current_node: 1}},
               id: :h2
             ),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h3, nodes: nodes}},
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h3, nodes: nodes, current_node: 1}},
               id: :h3
             )
           ]
