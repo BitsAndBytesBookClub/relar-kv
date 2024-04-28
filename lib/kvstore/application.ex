@@ -29,10 +29,10 @@ defmodule Kvstore.Application do
             Supervisor.child_spec({Kvstore.Handler, %{name: :h1, nodes: nodes, current_node: 1}},
               id: :h1
             ),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h2, nodes: nodes, current_node: 1}},
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h2, nodes: nodes, current_node: 2}},
               id: :h2
             ),
-            Supervisor.child_spec({Kvstore.Handler, %{name: :h3, nodes: nodes, current_node: 1}},
+            Supervisor.child_spec({Kvstore.Handler, %{name: :h3, nodes: nodes, current_node: 3}},
               id: :h3
             )
           ]
