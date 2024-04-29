@@ -1,5 +1,7 @@
 defmodule Kvstore.Broadcast do
   def broadcast(message) do
+    dbg(message)
+
     case Application.get_env(:kvstore, :broadcast) do
       nil -> :ok
       func -> func.(message)

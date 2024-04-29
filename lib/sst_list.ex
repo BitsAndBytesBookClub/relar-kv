@@ -92,7 +92,7 @@ defmodule Kvstore.SSTListG do
   end
 
   def handle_call({:add_level, name}, _from, state) do
-    Logger.info("Adding SST file: #{name}")
+    # Logger.info("Adding SST file: #{name}")
 
     {:ok, pid} =
       DynamicSupervisor.start_child(

@@ -237,7 +237,7 @@ defmodule Kvstore.Compaction.SSTToLevel0 do
   end
 
   def compact(node_id, cfg, sst_files) do
-    Logger.info("Compacting SSTables")
+    # Logger.info("Compacting SSTables")
 
     sst_files =
       sst_files

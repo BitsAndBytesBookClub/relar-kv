@@ -114,7 +114,7 @@ defmodule Kvstore.MemetableG do
   end
 
   def handle_cast({:done_writing}, %{old_table: ot} = state) do
-    Logger.info("Deleting old memetable")
+    # Logger.info("Deleting old memetable")
     true = :ets.delete(ot)
     {:noreply, %{state | old_table: nil}}
   end
