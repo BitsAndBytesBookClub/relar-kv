@@ -2,7 +2,7 @@ defmodule Kvstore.LSMPart do
   require Logger
 
   def get(nil, _key) do
-    Logger.info("Getting from nil part")
+    # Logger.info("Getting from nil part")
     nil
   end
 
