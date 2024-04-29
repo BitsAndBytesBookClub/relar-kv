@@ -45,7 +45,6 @@ defmodule Kvstore.SSTWriterG do
     Kvstore.SSTList.add(state.node_id, file_name)
     Kvstore.Memetable.done_writing(state.node_id)
     Kvstore.Compaction.add_sst(state.node_id)
-    Kvstore.Broadcast.broadcast({:sst_writen, state.node_id, file_name})
 
     {:reply, :ok, state}
   end

@@ -87,6 +87,8 @@ defmodule Kvstore.SSTListG do
         file
       end)
 
+    Kvstore.Broadcast.broadcast({:sst_removed, files, state.node_id})
+
     {:reply, :ok,
      %{state | files: Enum.reject(all_files, fn {f, _} -> Enum.member?(files, f) end)}}
   end
@@ -99,6 +101,8 @@ defmodule Kvstore.SSTListG do
         Kvstore.SSTFileSupervisor.name(state.node_id),
         {Kvstore.SSTFileG, %{node_id: state.node_id, file: name, path: state.path}}
       )
+
+    Kvstore.Broadcast.broadcast({:sst_writen, state.node_id, name})
 
     {:reply, :ok, %{state | files: [{name, pid} | state.files]}}
   end

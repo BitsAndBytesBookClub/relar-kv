@@ -103,6 +103,8 @@ defmodule Kvstore.LSMTreeG do
       levels
       |> Enum.find(fn {l, _, _} -> l == level end)
 
+    Kvstore.Broadcast.broadcast({:update_lsm, level, levels, node_id})
+
     case found do
       nil ->
         Logger.info("LSMTree | Starting LSMLevel: #{level}")
