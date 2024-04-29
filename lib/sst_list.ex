@@ -50,7 +50,7 @@ defmodule Kvstore.SSTListG do
   end
 
   def handle_call({:list}, _from, %{files: files} = state) do
-    Logger.debug("Listing SST files: #{inspect(files)}")
+    # Logger.debug("Listing SST files: #{inspect(files)}")
 
     atom_files =
       files

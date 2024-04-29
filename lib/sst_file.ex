@@ -37,7 +37,7 @@ defmodule Kvstore.SSTFileG do
   end
 
   def handle_call({:get, key}, _from, %{fd: fd, file: file} = state) do
-    Logger.debug("Reading SST key: #{key} in #{file}")
+    # Logger.debug("Reading SST key: #{key} in #{file}")
 
     {:ok, _} = :file.position(fd, {:bof, 0})
 
@@ -48,7 +48,7 @@ defmodule Kvstore.SSTFileG do
 
     case line do
       nil ->
-        Logger.debug("Key not found: #{key}")
+        # Logger.debug("Key not found: #{key}")
         {:reply, nil, state}
 
       line ->

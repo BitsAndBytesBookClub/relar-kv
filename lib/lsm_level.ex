@@ -103,7 +103,7 @@ defmodule Kvstore.LSMLevelG do
         _from,
         %{files: files, level: level, bounds: bounds, parts: parts} = state
       ) do
-    Logger.debug("Reading LSMLevel key: #{key}")
+    # Logger.debug("Reading LSMLevel key: #{key}")
 
     b1 = Enum.take(bounds, Enum.count(bounds) - 1)
     b2 = tl(bounds)
@@ -138,7 +138,7 @@ defmodule Kvstore.LSMLevelG do
         {:reply, nil, state}
 
       i ->
-        Logger.debug("Key in range for LSMLevel #{level}, file: #{Enum.at(files, i)}")
+        # Logger.debug("Key in range for LSMLevel #{level}, file: #{Enum.at(files, i)}")
         {:reply, Enum.at(parts, i), state}
     end
   end

@@ -79,7 +79,7 @@ defmodule Kvstore.LSMTreeG do
   end
 
   def handle_call({:get_levels}, _from, %{levels: levels} = state) do
-    Logger.debug("LSMTree | Listing LSM levels: #{inspect(levels)}")
+    # Logger.debug("LSMTree | Listing LSM levels: #{inspect(levels)}")
 
     {:reply, levels, state}
   end
