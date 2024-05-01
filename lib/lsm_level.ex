@@ -19,6 +19,10 @@ defmodule Kvstore.LSMLevel do
   def stop(pid) do
     GenServer.stop(pid)
   end
+
+  def list_parts({_, _, pid}) do
+    GenServer.call(pid, {:list_parts})
+  end
 end
 
 defmodule Kvstore.LSMLevelG do
@@ -141,6 +145,10 @@ defmodule Kvstore.LSMLevelG do
         # Logger.debug("Key in range for LSMLevel #{level}, file: #{Enum.at(files, i)}")
         {:reply, Enum.at(parts, i), state}
     end
+  end
+
+  def handle_call({:list_parts}, _from, %{files: files, bounds: bounds} = state) do
+    {:reply, Enum.zip(files, bounds), state}
   end
 end
 
