@@ -4,19 +4,14 @@ defmodule Kvstore.Memetable do
   end
 
   def get(node_id, key) do
-    result =
-      GenServer.call({:global, Kvstore.MemetableG.name(node_id)}, {:memtables})
-      |> Enum.reduce_while(nil, fn table, _ ->
-        case :ets.lookup(table, key) do
-          nil -> {:cont, nil}
-          v -> {:halt, v}
-        end
-      end)
-
-    case result do
-      [] -> nil
-      [{^key, value}] -> value
-    end
+    GenServer.call({:global, Kvstore.MemetableG.name(node_id)}, {:memtables})
+    |> Stream.map(fn table -> :ets.lookup(table, key) end)
+    |> Stream.filter(&(&1 != nil))
+    |> Enum.take(1)
+    |> then(fn
+      [[]] -> nil
+      [[{^key, value}]] -> value
+    end)
   end
 
   def done_writing(node_id) do
