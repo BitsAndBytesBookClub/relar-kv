@@ -1,5 +1,7 @@
 # Kvstore
 
+[deepwiki](https://deepwiki.com/BitsAndBytesBookClub/relar-kv)
+
 ## DB engine
 
 ![demo map](assets/demo_map.png)
